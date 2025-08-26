@@ -1,28 +1,54 @@
-I have a ml_delta.jsonl file that contains structured logs from Drain3 clustering.
-Each line is a JSON object with at least the following fields:
-	•	device_id
-	•	template_id
-	•	template_frequency
-	•	timestamp (or orig_timestamp)
-	•	log_level_text
+Processing file: d:\logai_new\logai\uploaded_files\D93LA0FE990815.jsonl
+d:\logai_new\logai\scripts\run_isolation_forest.py:29: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
 
-I want to run anomaly detection using LogAI’s Isolation Forest.
-Please generate a Python script that:
-	1.	Loads ml_delta.jsonl
-	2.	Converts timestamp to numeric format (e.g., epoch seconds)
-	3.	Extracts relevant features for anomaly detection
-	4.	Initializes and fits an Isolation Forest model using LogAI
-	5.	Predicts anomalies and adds is_anomaly column
-	6.	Saves the results to a .parquet or .jsonl file
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df["is_anomaly"] = model.predict(df[features])
+d:\logai_new\logai\scripts\run_isolation_forest.py:30: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
 
-Optional: show how to visualize or summarize the anomaly rate per device_id.
-⸻
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df["is_anomaly"] = df["is_anomaly"].apply(lambda x: 1 if x == -1 else 0)
+Processing file: d:\logai_new\logai\uploaded_files\D93LA9ME001025.jsonl
+Processing file: d:\logai_new\logai\uploaded_files\D93LD2EK990016.jsonl
+d:\logai_new\logai\scripts\run_isolation_forest.py:29: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
 
-I want the script to run anomaly detection per device, and also generate a combined output across all devices.
-Please:
-	•	Split the input by device_id
-	•	Run Isolation Forest on each device’s logs separately
-	•	Append results with is_anomaly field
-	•	Write:
-	•	One output file per device (e.g., D93LA9ME001025_results.parquet)
-	•	One combined results file (e.g., combined_results.parquet)
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df["is_anomaly"] = model.predict(df[features])
+d:\logai_new\logai\scripts\run_isolation_forest.py:30: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df["is_anomaly"] = df["is_anomaly"].apply(lambda x: 1 if x == -1 else 0)
+Processing file: d:\logai_new\logai\uploaded_files\N93FA9FJ000303.jsonl
+d:\logai_new\logai\scripts\run_isolation_forest.py:29: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df["is_anomaly"] = model.predict(df[features])
+d:\logai_new\logai\scripts\run_isolation_forest.py:30: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df["is_anomaly"] = df["is_anomaly"].apply(lambda x: 1 if x == -1 else 0)
+Processing file: d:\logai_new\logai\uploaded_files\N93VA0GG002981.jsonl
+d:\logai_new\logai\scripts\run_isolation_forest.py:29: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df["is_anomaly"] = model.predict(df[features])
+d:\logai_new\logai\scripts\run_isolation_forest.py:30: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  df["is_anomaly"] = df["is_anomaly"].apply(lambda x: 1 if x == -1 else 0)
+Results saved to d:\logai_new\logai\uploaded_files\anomaly_detection_results
