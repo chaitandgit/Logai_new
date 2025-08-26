@@ -1,54 +1,14 @@
-Processing file: d:\logai_new\logai\uploaded_files\D93LA0FE990815.jsonl
-d:\logai_new\logai\scripts\run_isolation_forest.py:29: SettingWithCopyWarning: 
-A value is trying to be set on a copy of a slice from a DataFrame.
-Try using .loc[row_indexer,col_indexer] = value instead
+	1.	Loads all .parquet files in a folder (like uploaded_files/anomaly_detection_results)
+	2.	For each file (per device), reads is_anomaly, template_id, orig_timestamp, device_id
+	3.	Calculates:
+	•	total rows
+	•	total anomalies (is_anomaly == 1)
+	•	anomaly rate
+	•	unique template count
+	•	top anomaly templates
+	•	earliest and latest orig_timestamp
+	4.	Outputs two CSVs:
+	•	One combined summary CSV for all devices
+	•	One individual CSV per device in a folder extracted_anomaly_features
 
-See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
-  df["is_anomaly"] = model.predict(df[features])
-d:\logai_new\logai\scripts\run_isolation_forest.py:30: SettingWithCopyWarning: 
-A value is trying to be set on a copy of a slice from a DataFrame.
-Try using .loc[row_indexer,col_indexer] = value instead
-
-See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
-  df["is_anomaly"] = df["is_anomaly"].apply(lambda x: 1 if x == -1 else 0)
-Processing file: d:\logai_new\logai\uploaded_files\D93LA9ME001025.jsonl
-Processing file: d:\logai_new\logai\uploaded_files\D93LD2EK990016.jsonl
-d:\logai_new\logai\scripts\run_isolation_forest.py:29: SettingWithCopyWarning: 
-A value is trying to be set on a copy of a slice from a DataFrame.
-Try using .loc[row_indexer,col_indexer] = value instead
-
-See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
-  df["is_anomaly"] = model.predict(df[features])
-d:\logai_new\logai\scripts\run_isolation_forest.py:30: SettingWithCopyWarning: 
-A value is trying to be set on a copy of a slice from a DataFrame.
-Try using .loc[row_indexer,col_indexer] = value instead
-
-See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
-  df["is_anomaly"] = df["is_anomaly"].apply(lambda x: 1 if x == -1 else 0)
-Processing file: d:\logai_new\logai\uploaded_files\N93FA9FJ000303.jsonl
-d:\logai_new\logai\scripts\run_isolation_forest.py:29: SettingWithCopyWarning: 
-A value is trying to be set on a copy of a slice from a DataFrame.
-Try using .loc[row_indexer,col_indexer] = value instead
-
-See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
-  df["is_anomaly"] = model.predict(df[features])
-d:\logai_new\logai\scripts\run_isolation_forest.py:30: SettingWithCopyWarning: 
-A value is trying to be set on a copy of a slice from a DataFrame.
-Try using .loc[row_indexer,col_indexer] = value instead
-
-See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
-  df["is_anomaly"] = df["is_anomaly"].apply(lambda x: 1 if x == -1 else 0)
-Processing file: d:\logai_new\logai\uploaded_files\N93VA0GG002981.jsonl
-d:\logai_new\logai\scripts\run_isolation_forest.py:29: SettingWithCopyWarning: 
-A value is trying to be set on a copy of a slice from a DataFrame.
-Try using .loc[row_indexer,col_indexer] = value instead
-
-See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
-  df["is_anomaly"] = model.predict(df[features])
-d:\logai_new\logai\scripts\run_isolation_forest.py:30: SettingWithCopyWarning: 
-A value is trying to be set on a copy of a slice from a DataFrame.
-Try using .loc[row_indexer,col_indexer] = value instead
-
-See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
-  df["is_anomaly"] = df["is_anomaly"].apply(lambda x: 1 if x == -1 else 0)
-Results saved to d:\logai_new\logai\uploaded_files\anomaly_detection_results
+Optional: Skip rows with invalid or very old timestamps (older than 30 days)
