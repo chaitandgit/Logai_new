@@ -1,2 +1,2 @@
-device_id,total_rows,total_anomalies,anomaly_rate,unique_templates,top_anomaly_templates,earliest_timestamp,latest_timestamp
-D93LA9ME001025,18718,1466,0.0783,89,"{'93bd7f8c1e57a8dce6e16c67dcd04ce002970cab': 826, '7ab2a6e6bbf2668b8cc9f4defe87cd60aa02fcea': 151, '58f96ff66502af679d09853cff66314e0b4a5c45': 120, '47a263b47b7ba16370344902aa5fc87e536e0133': 102, '28edb9654f59839454f1fb2dcfe9625a5b1b2147': 95}",2025-08-11 22:04:51.693820,2025-08-26 20:04:35.847631
+
+“In my run_isolation_forest.py, after fitting IsolationForest, add a column anomaly_score using model.decision_function() and include it in the output parquet or CSV. The lower the score, the more anomalous it is. Use .loc[] to avoid the SettingWithCopyWarning.”
