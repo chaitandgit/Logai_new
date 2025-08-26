@@ -1,55 +1,55 @@
-#!/usr/bin/env python3
-"""
-Wrapper script to extract features from clustered Drain3 logs (ml_delta.jsonl)
-and save them in a CSV format suitable for LogAI input.
-"""
-
 import json
 import csv
+import hashlib
 from datetime import datetime
 
-# Input/Output files
-INPUT_FILE = "drain_logs/ml_delta.jsonl"
-OUTPUT_FILE = "extracted_features.csv"
+INPUT_FILE = "Sample_logs.txt"
+OUTPUT_FILE = "logai_features.csv"
 
-# Helper: Convert ISO 8601 timestamp to float seconds (optional)
-def timestamp_to_float(ts: str) -> float:
+def parse_timestamp(orig_ts):
     try:
-        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        # Convert ISO timestamp to epoch seconds with fractional part
+        dt = datetime.fromisoformat(orig_ts.replace("Z", "+00:00"))
         return dt.timestamp()
     except Exception:
-        return 0.0
+        return None
 
-# Main conversion logic
-def convert_jsonl_to_csv(input_path: str, output_path: str):
-    with open(input_path, "r", encoding="utf-8") as infile, open(output_path, "w", newline='', encoding="utf-8") as outfile:
-        writer = csv.writer(outfile)
-        # Column headers expected by LogAI
-        writer.writerow([
+def extract_features(entry, record_id):
+    logline = entry.get("sample_logs", [""])[0]
+    device_id = entry.get("device_id", "")
+    template_id = entry.get("template_id", "")
+    log_level_text = entry.get("log_level_text", "")
+    template_frequency = entry.get("template_frequency", 1)
+    orig_timestamp = entry.get("orig_timestamp", "")
+    timestamp = parse_timestamp(orig_timestamp)
+
+    return {
+        "logline": logline,
+        "_id": record_id,
+        "is_anomaly": False,
+        "device_id": device_id,
+        "template_id": template_id,
+        "log_level_text": log_level_text,
+        "template_frequency": template_frequency,
+        "timestamp": timestamp
+    }
+
+def main():
+    with open(INPUT_FILE, "r", encoding="utf-8") as infile, open(OUTPUT_FILE, "w", newline='', encoding="utf-8") as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=[
             "logline", "_id", "is_anomaly", "device_id",
             "template_id", "log_level_text", "template_frequency", "timestamp"
         ])
-
-        id_counter = 0
-        for line in infile:
-            try:
-                data = json.loads(line)
-                sample_logs = data.get("sample_logs", [])
-                for logline in sample_logs:
-                    writer.writerow([
-                        logline,
-                        id_counter,
-                        False,
-                        data.get("device_id"),
-                        data.get("template_id"),
-                        data.get("log_level_text"),
-                        data.get("template_frequency", 1),
-                        timestamp_to_float(data.get("first_seen", ""))
-                    ])
-                    id_counter += 1
-            except json.JSONDecodeError:
+        writer.writeheader()
+        for i, line in enumerate(infile):
+            if not line.strip():
                 continue
+            try:
+                entry = json.loads(line)
+                features = extract_features(entry, record_id=i)
+                writer.writerow(features)
+            except Exception as e:
+                print(f"[WARN] Skipping line {i}: {e}")
 
 if __name__ == "__main__":
-    convert_jsonl_to_csv(INPUT_FILE, OUTPUT_FILE)
-    print(f"Extracted features saved to: {OUTPUT_FILE}")
+    main()
