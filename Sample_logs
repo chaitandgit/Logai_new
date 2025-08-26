@@ -1,2 +1,13 @@
 device_id,total_events,unique_templates,top_template,top_template_count,avg_template_frequency,anomaly_rate,earliest_timestamp,latest_timestamp
 D93LA9ME001025,19258,130,bc3e57e7cae42f4b4e5e8cc4eec71d097e151c4c,1383,37.701,0.0,1969-12-31T18:01:00.125592,2025-08-26T15:04:35.847631
+
+
+“Please improve this feature extraction script:
+	1.	Ignore logs older than 30 days based on orig_timestamp, timestamp, or first_seen.
+	•	Modify parse_timestamp() so that it returns None if the log is older than 30 days from now.
+	2.	Add a new feature: avg_logs_per_template, computed as total_events / unique_templates (avoid division by zero).
+	3.	Keep existing output files: combined_features.csv and per-device feature CSVs.
+	4.	If possible, also ensure timestamps like “60.125592” (invalid Unix timestamps) are excluded.
+
+Let me know if you need the original script.”
+
