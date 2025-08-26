@@ -1,15 +1,28 @@
+I have a ml_delta.jsonl file that contains structured logs from Drain3 clustering.
+Each line is a JSON object with at least the following fields:
+	•	device_id
+	•	template_id
+	•	template_frequency
+	•	timestamp (or orig_timestamp)
+	•	log_level_text
 
-“Now I want to run anomaly detection using LogAI.
-My input is a .csv file of extracted features or raw clustered logs (JSONL or Parquet).
-I want to use the Isolation Forest algorithm.
-
+I want to run anomaly detection using LogAI’s Isolation Forest.
 Please generate a Python script that:
-	•	Loads the clustered log data or features from file
-	•	Uses LogAI to detect anomalies using Isolation Forest
-	•	Appends a new column is_anomaly to the dataset
-	•	Saves the results to a .parquet or .jsonl file
+	1.	Loads ml_delta.jsonl
+	2.	Converts timestamp to numeric format (e.g., epoch seconds)
+	3.	Extracts relevant features for anomaly detection
+	4.	Initializes and fits an Isolation Forest model using LogAI
+	5.	Predicts anomalies and adds is_anomaly column
+	6.	Saves the results to a .parquet or .jsonl file
 
-If needed, preprocess timestamp into numeric format, and normalize any numeric fields.
-Show me how to configure the model using LogAI’s config or API.
-Also show how to view the number of detected anomalies per device.”
+Optional: show how to visualize or summarize the anomaly rate per device_id.
+⸻
 
+I want the script to run anomaly detection per device, and also generate a combined output across all devices.
+Please:
+	•	Split the input by device_id
+	•	Run Isolation Forest on each device’s logs separately
+	•	Append results with is_anomaly field
+	•	Write:
+	•	One output file per device (e.g., D93LA9ME001025_results.parquet)
+	•	One combined results file (e.g., combined_results.parquet)
