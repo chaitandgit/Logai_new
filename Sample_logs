@@ -1,14 +1,2 @@
-	1.	Loads all .parquet files in a folder (like uploaded_files/anomaly_detection_results)
-	2.	For each file (per device), reads is_anomaly, template_id, orig_timestamp, device_id
-	3.	Calculates:
-	•	total rows
-	•	total anomalies (is_anomaly == 1)
-	•	anomaly rate
-	•	unique template count
-	•	top anomaly templates
-	•	earliest and latest orig_timestamp
-	4.	Outputs two CSVs:
-	•	One combined summary CSV for all devices
-	•	One individual CSV per device in a folder extracted_anomaly_features
-
-Optional: Skip rows with invalid or very old timestamps (older than 30 days)
+device_id,total_rows,total_anomalies,anomaly_rate,unique_templates,top_anomaly_templates,earliest_timestamp,latest_timestamp
+D93LA9ME001025,18718,1466,0.0783,89,"{'93bd7f8c1e57a8dce6e16c67dcd04ce002970cab': 826, '7ab2a6e6bbf2668b8cc9f4defe87cd60aa02fcea': 151, '58f96ff66502af679d09853cff66314e0b4a5c45': 120, '47a263b47b7ba16370344902aa5fc87e536e0133': 102, '28edb9654f59839454f1fb2dcfe9625a5b1b2147': 95}",2025-08-11 22:04:51.693820,2025-08-26 20:04:35.847631
