@@ -1,24 +1,20 @@
+{"template_id": "abd5159bbe0c8f02b1b8612745e24f940a62bc91", "template": "<TIME> L1 amx-processmonitor: File not found <PATH>", "device_id": "D93LA9ME001025", "count": 2, "first_seen": "1970-01-01T00:01:00.125592Z", "last_seen": "1970-01-01T00:01:00.773434Z", "log_level_code": "L1", "log_level_text": "ALERT", "sample_logs": ["<TIME> L1 amx-processmonitor: File not found <PATH>"], "reason": "new template", "orig_timestamp": "1969-12-31T18:01:00.125592-06:00", "template_frequency": 2, "suspicious": false}
+{"template_id": "41748f3d81ae3d974dceb33d421a63ad2c3a1944", "template": "<TIME> L5 procd: <PATH>: Starting recovery_downgrade_failover", "device_id": "D93LA9ME001025", "count": 1, "first_seen": "1970-01-01T00:01:01.108375Z", "last_seen": "1970-01-01T00:01:01.108375Z", "log_level_code": "L5", "log_level_text": "NOTICE", "sample_logs": ["<TIME> L5 procd: <PATH>: Starting recovery_downgrade_failover"], "reason": "new template", "orig_timestamp": "1969-12-31T18:01:01.108375-06:00", "template_frequency": 1, "suspicious": false}
+{"template_id": "76f2b22c65d4cfd0f7c6391bc7397008a9926d75", "template": "<TIME> L5 procd: <PATH>: <*> <*>", "device_id": "D93LA9ME001025", "count": 1, "first_seen": "1970-01-01T00:01:01.111049Z", "last_seen": "1970-01-01T00:01:01.111049Z", "log_level_code": "L5", "log_level_text": "NOTICE", "sample_logs": ["<TIME> L5 procd: <PATH>: recovery_downgrade_failover launched!"], "reason": "new template", "orig_timestamp": "1969-12-31T18:01:01.111049-06:00", "template_frequency": 1, "suspicious": false}
+{"template_id": "580e245d16524413973d7f0c30e75518fb47517e", "template": "<TIME> L7 recovery_downgrade_failover: ======RDFM: Service Started !!!!!!!!!===========", "device_id": "D93LA9ME001025", "count": 1, "first_seen": "1970-01-01T00:01:01.243221Z", "last_seen": "1970-01-01T00:01:01.243221Z", "log_level_code": "L7", "log_level_text": "DEBUG", "sample_logs": ["<TIME> L7 recovery_downgrade_failover: ======RDFM: Service Started !!!!!!!!!==========="], "reason": "new template", "orig_timestamp": "1969-12-31T18:01:01.243221-06:00", "template_frequency": 1, "suspicious": false}
+{"template_id": "3ecc4596834e8c211237847f7d8ad405fd01c5e2", "template": "<TIME> L7 recovery_downgrade_failover: Load File - Parse File : 0", "device_id": "D93LA9ME001025", "count": 1, "first_seen": "1970-01-01T00:01:01.253888Z", "last_seen": "1970-01-01T00:01:01.253888Z", "log_level_code": "L7", "log_level_text": "DEBUG", "sample_logs": ["<TIME> L7 recovery_downgrade_failover: Load File - Parse File : 0"], "reason": "new template", "orig_timestamp": "1969-12-31T18:01:01.253888-06:00", "template_frequency": 1, "suspicious": false}
+{"template_id": "04eeff95c19ae7f5d004a241be2fa575b3308f28", "template": "<TIME> L7 recovery_downgrade_failover: RDFM : Successfully opened connection to sdb", "device_id": "D93LA9ME001025", "count": 1, "first_seen": "1970-01-01T00:01:01.253888Z", "last_seen": "1970-01-01T00:01:01.253888Z", "log_level_code": "L7", "log_level_text": "DEBUG", "sample_logs": ["<TIME> L7 recovery_downgrade_failover: RDFM : Successfully opened connection to sdb"], "reason": "new template", "orig_timestamp": "1969-12-31T18:01:01.253888-06:00", "template_frequency": 1, "suspicious": false}
+{"template_id": "0c80d17faadf6f437187bba1d4988d76032b1987", "template": "<TIME> L7 recovery_downgrade_failover: RDFM : <*> <*> connection to sdb", "device_id": "D93LA9ME001025", "count": 1, "first_seen": "1970-01-01T00:01:01.253888Z", "last_seen": "1970-01-01T00:01:01.253888Z", "log_level_code": "L7", "log_level_text": "DEBUG", "sample_logs": ["<TIME> L7 recovery_downgrade_failover: RDFM : successfully established connection to sdb"], "reason": "new template", "orig_timestamp": "1969-12-31T18:01:01.253888-06:00", "template_frequency": 1, "suspicious": false}
+{"template_id": "86521d9926079985d27ce3d2c273de5f787ec768", "template": "<TIME> L7 recovery_downgrade_failover: protocol table list index 2 name dhcpv4_client", "device_id": "D93LA9ME001025", "count": 1, "first_seen": "1970-01-01T00:01:01.253888Z", "last_seen": "1970-01-01T00:01:01.253888Z", "log_level_code": "L7", "log_level_text": "DEBUG", "sample_logs": ["<TIME> L7 recovery_downgrade_failover: protocol table list index 2 name dhcpv4_client"], "reason": "new template", "orig_timestamp": "1969-12-31T18:01:01.253888-06:00", "template_frequency": 1, "suspicious": false}
+{"template_id": "c66904490dc62cd2abb74e1df1311d38c2f30345", "template": "<TIME> L7 recovery_downgrade_failover: <*> <*> <*> <*>", "device_id": "D93LA9ME001025", "count": 3, "first_seen": "1970-01-01T00:01:01.253888Z", "last_seen": "1970-01-01T00:01:01.258444Z", "log_level_code": "L7", "log_level_text": "DEBUG", "sample_logs": ["<TIME> L7 recovery_downgrade_failover: active protocols name IEEE8021x_Manager,dhcpv4_client", "<TIME> L7 recovery_downgrade_failover: cwmp_upgrade_status value is 0"], "reason": "new template", "orig_timestamp": "1969-12-31T18:01:01.253888-06:00", "template_frequency": 3, "suspicious": false}
+{"template_id": "d2da45098b05b39026f86462c7d05d1de2bafed4", "template": "<TIME> L7 recovery_downgrade_failover: active protocol list IEEE8021x_Manager,dhcpv4_client in persistent protocol table dhcpv4_client", "device_id": "D93LA9ME001025", "count": 1, "first_seen": "1970-01-01T00:01:01.253888Z", "last_seen": "1970-01-01T00:01:01.253888Z", "log_level_code": "L7", "log_level_text": "DEBUG", "sample_logs": ["<TIME> L7 recovery_downgrade_failover: active protocol list IEEE8021x_Manager,dhcpv4_client in  persistent protocol table dhcpv4_client"], "reason": "new template", "orig_timestamp": "1969-12-31T18:01:01.253888-06:00", "template_frequency": 1, "suspicious": false}
 
-import os
-from fastapi import FastAPI, Request, HTTPException
 
-app = FastAPI()
-API_SECRET = os.getenv("API_SECRET", "changeme123")  # fallback if not set
+logline,_id,is_anomaly,device_id,template_id,log_level_text,template_frequency,timestamp
+<TIME> L1 amx-processmonitor: File not found <PATH>,0,False,D93LA9ME001025,abd5159bbe0c8f02b1b8612745e24f940a62bc91,ALERT,2,60.125592
+<TIME> L5 procd: <PATH>: Starting recovery_downgrade_failover,1,False,D93LA9ME001025,41748f3d81ae3d974dceb33d421a63ad2c3a1944,NOTICE,1,61.108375
+<TIME> L5 procd: <PATH>: recovery_downgrade_failover launched!,2,False,D93LA9ME001025,76f2b22c65d4cfd0f7c6391bc7397008a9926d75,NOTICE,1,61.111049
+<TIME> L7 recovery_downgrade_failover: ======RDFM: Service Started !!!!!!!!!===========,3,False,D93LA9ME001025,580e245d16524413973d7f0c30e75518fb47517e,DEBUG,1,61.243221
+<TIME> L7 recovery_downgrade_failover: Load File - Parse File : 0,4,False,D93LA9ME001025,3ecc4596834e8c211237847f7d8ad405fd01c5e2,DEBUG,1,61.253888
 
-@app.post("/ingest")
-async def ingest(request: Request):
-    # Secret check
-    auth = request.headers.get("X-API-KEY")
-    if auth != API_SECRET:
-        raise HTTPException(status_code=401, detail="Unauthorized")
 
-    device_id = request.headers.get("X-Device-ID", "unknown-device")
-    data = await request.body()
-
-    os.makedirs("received_logs", exist_ok=True)
-    file_path = f"received_logs/{device_id}.jsonl"
-
-    with open(file_path, "ab") as f:
-        f.write(data + b"\n")
-
-    return {"status": "ok", "device": device_id}
