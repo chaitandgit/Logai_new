@@ -1,38 +1,5 @@
-cat /input/data/restart.log | grep 1969
-1969-12-31T18:01:00.773434-06:00 L1 amx-processmonitor: File not found /data/system/prpl/config/amx/amx-processmonitor/amx-processmonitor_config.odl
-1969-12-31T18:01:26.663323-06:00 L3 sdb: PRCRST[5793]: sdb_conn_ubus_invoke(), Failed to invoke ubus method SendDhcpEvent, err code 7, attempt 1
-1969-12-31T18:01:29.666886-06:00 L3 sdb: PRCRST[5793]: sdb_conn_ubus_invoke(), Failed to invoke ubus method SendDhcpEvent, err code 7, attempt 2
-1969-12-31T18:01:29.666886-06:00 L3 sdb: PRCRST[5793]: sdb_conn_ubus_invoke(), Failed to invoke ubus method SendDhcpEvent, err code 7
-
-
-
-{
-    "count": 4,
-    "first_seen": "1970-01-01T00:01:23Z",
-    "last_seen": "1970-01-01T00:01:23Z",
-    "sample_log": "1969-12-31T18:01:23.795460-06:00 L2 HAT_ABSTRACTION: tunnel_failover notification from ha_agent"
-  },
-  "5": {
-    "count": 8,
-    "first_seen": "1970-01-01T00:01:01Z",
-    "last_seen": "1970-01-01T00:01:01Z",
-    "sample_log": "1969-12-31T18:01:01.108375-06:00 L5 procd: /etc/rc.d/S99recovery_downgrade_failover: Starting recovery_downgrade_failover"
-  },
-  "6": {
-    "count": 16,
-    "first_seen": "1970-01-01T00:01:01Z",
-    "last_seen": "1970-01-01T00:01:01Z",
-    "sample_log": "1969-12-31T18:01:01.243221-06:00 L7 recovery_downgrade_failover: ======RDFM: Service Started !!!!!!!!!==========="
-  },
-  "7": {
-    "count": 4,
-    "first_seen": "1970-01-01T00:01:01Z",
-    "last_seen": "1970-01-01T00:01:01Z",
-    "sample_log": "1969-12-31T18:01:01.253888-06:00 L7 recovery_downgrade_failover: Load File - Parse File : 0"
-  },
-
-
-/output/log_parser # wc -l seen_templates.json
-607 seen_templates.json
 /output/log_parser # wc -l drain.jsonl
-6183 drain.jsonl
+150 drain.jsonl
+/output/log_parser # wc -l seen_templates.json
+1057 seen_templates.json
+why they both are different?
