@@ -1,20 +1,24 @@
 # Logai_new
 
 
-1.	Monitor /input/var and /input/data directories for .log and .txt files using watchdog
-	2.	Use Drain3 to cluster log lines into templates, persisting state with FilePersistence
-	3.	Extract timestamps (from ISO 8601 or common formats) and track first_seen and last_seen
-	4.	Track log-level (INFO, DEBUG, ERROR, WARN, CRITICAL) and also allow unknown levels as "UNKNOWN"
-	5.	Mask dynamic content in logs like timestamps and IP addresses
-	6.	Write enriched log templates to:
-	•	ml_delta_append.jsonl (only new/updated templates)
-	•	drain.jsonl (full templates with count and last_seen updates)
-	7.	Maintain a seen_templates.json dictionary to deduplicate and persist known clusters
-	8.	Ensure UTF-8 safe writes and handle corrupted JSON lines gracefully
-	9.	Skip writing to disk (i.e., dry-run mode, just print enriched JSON to console for now)
-	10.	Include logging to console and to drain_runner.log
-	11.	Skip files not ending in .log or .txt, and track them in ignored_files.log
-	12.	Be well-commented and organized with clear functions for: initial_scan, write_to_files, extract_timestamp, build_miner, etc.
-	13.	Use os.environ.get to allow configurable paths like BASE_OUTPUT, DEVICE_ID, and NAME_CONTAINS
-	14.	Ensure drain.jsonl is complete with any missing templates from seen_templates.json
-	15.	Log everything with debug/info/warning levels and clearly explain what each function does
+Please enhance this existing Python script used to cluster log files using Drain3 on embedded/containerized devices.
+
+✅ The following features are already implemented, so keep them as-is:
+	•	Uses watchdog to monitor .log and .txt files in /input/var and /input/data
+	•	Extracts timestamps from log lines in ISO and other formats
+	•	Uses Drain3 for clustering
+	•	Tracks first_seen, last_seen, count, sample_log, and template_id
+	•	Writes full clusters to drain.jsonl and delta updates to ml_delta_append.jsonl
+	•	Maintains seen_templates.json for persistence
+	•	Skips invalid extensions, tracks skipped files in ignored_files.log
+	•	Logs to console and drain_runner.log, supports BASE_OUTPUT, DEVICE_ID, and NAME_CONTAINS from env vars
+	•	Handles malformed JSON, unknown log levels, and UTF-8 encoding
+
+🚧 Now add or fix the following missing pieces:
+	1.	Mask IP addresses in each log line (both IPv4 and IPv6) using regex before clustering.
+	2.	Add a DRY_RUN toggle (boolean or env var). When True, the script should skip writing to disk and just print the enriched JSON to stdout.
+	3.	Fix the watchdog observer to recursively monitor all subdirectories inside /input/var and /input/data, not just specific files.
+
+🧩 Bonus if possible:
+	•	Ensure comments and structure are clean and readable.
+	•	Validate that each function logs what it’s doing with DEBUG or INFO level messages.
