@@ -1,248 +1,306 @@
-import json
-import csv
-from pathlib import Path
-from datetime import datetime
-from collections import Counter, defaultdict
+#!/usr/local/bin/python3
+"""
+Drain3 Runner - Version-2 for Containers on RG Devices
 
-try:
-    import pandas as pd
-except Exception:
-    pd = None
+Key Features:
+- Clusters logs using Drain3 template miner
+- Extracts timestamps from logs for accurate first_seen/last_seen
+- Cleans and masks log lines (e.g., timestamps, IPs)
+- Adds sample logs (marked as such)
+- Excludes `source` from ML logs, keeps it in drain.jsonl for Kibana
+- Safely handles unknown and extended log levels (L8+)
+- Includes UTF-8 safe writes
+"""
 
+# --- Imports and Setup ---
+import os, re, json, logging
+from datetime import datetime, timezone
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+from drain3.template_miner import TemplateMiner
+from drain3.file_persistence import FilePersistence
+from drain3.template_miner_config import TemplateMinerConfig
 
-def parse_timestamp(orig_ts):
-    if not orig_ts:
-        return None
-    try:
-        dt = datetime.fromisoformat(orig_ts.replace("Z", "+00:00"))
-        return dt.timestamp()
-    except Exception:
-        try:
-            return float(orig_ts)
-        except Exception:
-            return None
+# --- Config ---
+CONFIG = {
+    "log_dirs": ["/input/var", "/input/data"],
+    "base_output": os.environ.get("BASE_OUTPUT", "/output/log_parser"),
+    "name_contains": os.environ.get("NAME_CONTAINS", "log").lower()
+}
+CONFIG.update({
+    "delta_file": os.path.join(CONFIG["base_output"], "ml_delta_append.jsonl"),
+    "full_file": os.path.join(CONFIG["base_output"], "drain.jsonl"),
+    "seen_file": os.path.join(CONFIG["base_output"], "seen_templates.json")
+})
+os.makedirs(CONFIG["base_output"], exist_ok=True)
 
-
-def process_jsonl_file(path, agg):
-    with open(path, "r", encoding="utf-8", errors="replace") as fh:
-        for line in fh:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = json.loads(line)
-            except Exception:
-                continue
-            device = entry.get("device_id") or entry.get("device") or "unknown"
-            tmpl = entry.get("template_id") or entry.get("template") or ""
-            tf = entry.get("template_frequency")
-            try:
-                tf = float(tf) if tf is not None else 1.0
-            except Exception:
-                tf = 1.0
-            is_anom = bool(entry.get("is_anomaly") or entry.get("suspicious"))
-            ts = parse_timestamp(entry.get("orig_timestamp") or entry.get("timestamp") or entry.get("first_seen"))
-
-            d = agg[device]
-            d["total_events"] += 1
-            d["sum_template_frequency"] += tf
-            d["anomaly_count"] += 1 if is_anom else 0
-            if tmpl:
-                d["templates_counter"][tmpl] += 1
-            if ts:
-                if d["earliest_ts"] is None or ts < d["earliest_ts"]:
-                    d["earliest_ts"] = ts
-                if d["latest_ts"] is None or ts > d["latest_ts"]:
-                    d["latest_ts"] = ts
-
-
-def process_parquet_file(path, agg):
-    if pd is None:
-        print(f"[WARN] pandas not available, skipping parquet file: {path}")
-        return
-    try:
-        df = pd.read_parquet(path)
-    except Exception as e:
-        print(f"[WARN] Failed to read parquet {path}: {e}")
-        return
-
-    for _, row in df.iterrows():
-        device = row.get("device_id") or row.get("device") or "unknown"
-        tmpl = row.get("template_id") or row.get("template") or ""
-        tf = row.get("template_frequency")
-        try:
-            tf = float(tf) if tf is not None else 1.0
-        except Exception:
-            tf = 1.0
-        is_anom = bool(row.get("is_anomaly") or row.get("suspicious"))
-        ts = parse_timestamp(row.get("orig_timestamp") or row.get("timestamp") or row.get("first_seen"))
-
-        d = agg[device]
-        d["total_events"] += 1
-        d["sum_template_frequency"] += tf
-        d["anomaly_count"] += 1 if is_anom else 0
-        if tmpl:
-            d["templates_counter"][tmpl] += 1
-        if ts:
-            if d["earliest_ts"] is None or ts < d["earliest_ts"]:
-                d["earliest_ts"] = ts
-            if d["latest_ts"] is None or ts > d["latest_ts"]:
-                d["latest_ts"] = ts
-
-
-def make_empty_device_record():
-    return {
-        "total_events": 0,
-        "sum_template_frequency": 0.0,
-        "anomaly_count": 0,
-        "templates_counter": Counter(),
-        "earliest_ts": None,
-        "latest_ts": None,
-    }
-
-
-def write_features_csv(output_path, agg):
-    fieldnames = [
-        "device_id",
-        "total_events",
-        "unique_templates",
-        "top_template",
-        "top_template_count",
-        "avg_template_frequency",
-        "anomaly_rate",
-        "earliest_timestamp",
-        "latest_timestamp",
+# --- Logging Setup ---
+logging.basicConfig(
+    level=logging.DEBUG,  # Changed from INFO to DEBUG to enable debug messages
+    format="%(asctime)s %(levelname)s %(message)s",
+    handlers=[
+        logging.FileHandler(os.path.join(CONFIG["base_output"], "drain_runner.log"), mode="w", encoding="utf-8"),
+        logging.StreamHandler()
     ]
-    with open(output_path, "w", newline='', encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=fieldnames)
-        writer.writeheader()
-        for device, d in sorted(agg.items()):
-            total = d["total_events"]
-            unique_templates = len(d["templates_counter"]) if d["templates_counter"] else 0
-            top_template, top_count = (None, 0)
-            if d["templates_counter"]:
-                top_template, top_count = d["templates_counter"].most_common(1)[0]
-            avg_tf = (d["sum_template_frequency"] / total) if total else 0.0
-            anomaly_rate = (d["anomaly_count"] / total) if total else 0.0
-            earliest = datetime.fromtimestamp(d["earliest_ts"]).isoformat() if d["earliest_ts"] else ""
-            latest = datetime.fromtimestamp(d["latest_ts"]).isoformat() if d["latest_ts"] else ""
+)
+log = logging.getLogger("drain3_runner")
 
-            writer.writerow({
-                "device_id": device,
-                "total_events": total,
-                "unique_templates": unique_templates,
-                "top_template": top_template,
-                "top_template_count": top_count,
-                "avg_template_frequency": round(avg_tf, 3),
-                "anomaly_rate": round(anomaly_rate, 4),
-                "earliest_timestamp": earliest,
-                "latest_timestamp": latest,
-            })
+# --- Utility Functions ---
+def load_seen(path):
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except:
+        return {}
 
+def save_seen(path, seen):
+    log.debug(f"Saving seen dictionary to {path}: {json.dumps(seen, indent=2)}")
+    with open(path, "w") as f:
+        json.dump(seen, f, indent=2)
 
-def write_device_features(output_dir, agg):
-    """Write individual device feature files."""
-    output_dir.mkdir(parents=True, exist_ok=True)
-    fieldnames = [
-        "device_id",
-        "total_events",
-        "unique_templates",
-        "top_template",
-        "top_template_count",
-        "avg_template_frequency",
-        "anomaly_rate",
-        "earliest_timestamp",
-        "latest_timestamp",
-    ]
-    for device, d in agg.items():
-        device_file = output_dir / f"{device}_features.csv"
-        with open(device_file, "w", newline='', encoding="utf-8") as fh:
-            writer = csv.DictWriter(fh, fieldnames=fieldnames)
-            writer.writeheader()
-            total = d["total_events"]
-            unique_templates = len(d["templates_counter"]) if d["templates_counter"] else 0
-            top_template, top_count = (None, 0)
-            if d["templates_counter"]:
-                top_template, top_count = d["templates_counter"].most_common(1)[0]
-            avg_tf = (d["sum_template_frequency"] / total) if total else 0.0
-            anomaly_rate = (d["anomaly_count"] / total) if total else 0.0
-            earliest = datetime.fromtimestamp(d["earliest_ts"]).isoformat() if d["earliest_ts"] else ""
-            latest = datetime.fromtimestamp(d["latest_ts"]).isoformat() if d["latest_ts"] else ""
+def clean_log_line(line):
+    return re.sub(r'\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[-+]\d{2}:?\d{2})?', '<TIME>', line)
 
-            writer.writerow({
-                "device_id": device,
-                "total_events": total,
-                "unique_templates": unique_templates,
-                "top_template": top_template,
-                "top_template_count": top_count,
-                "avg_template_frequency": round(avg_tf, 3),
-                "anomaly_rate": round(anomaly_rate, 4),
-                "earliest_timestamp": earliest,
-                "latest_timestamp": latest,
-            })
+def extract_timestamp(line):
+    try:
+        match = re.search(r'(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})', line)
+        if match:
+            ts = datetime.fromisoformat(match.group(1).replace(' ', 'T'))
+            return ts.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
+    except:
+        pass
+    return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
-
-def main(uploaded_dir: str = None):
-    base_dir = Path(uploaded_dir) if uploaded_dir else Path(__file__).resolve().parents[1] / "uploaded_files"
-    if not base_dir.exists():
-        print(f"[ERROR] uploaded_files directory not found: {base_dir}")
-        return
-
-    agg = defaultdict(make_empty_device_record)
-
-    for p in sorted(base_dir.iterdir()):
-        if p.is_dir():
-            continue
-        name = p.name.lower()
+# --- Drain3 Setup ---
+def build_miner(state_file):
+    cfg = TemplateMinerConfig()
+    cfg.similarity = 0.5
+    cfg.depth = 5
+    miner = TemplateMiner(FilePersistence(state_file), cfg)
+    if os.path.exists(state_file):
         try:
-            if name.endswith(".jsonl") or name.endswith(".jsonl.gz"):
-                process_jsonl_file(p, agg)
-            elif name.endswith(".results.parquet") or name.endswith(".parquet"):
-                process_parquet_file(p, agg)
-            elif name.endswith(".json"):
-                try:
-                    with open(p, "r", encoding="utf-8") as fh:
-                        data = json.load(fh)
-                    if isinstance(data, list):
-                        for entry in data:
-                            device = entry.get("device_id") or entry.get("device") or "unknown"
-                            tmpl = entry.get("template_id") or entry.get("template") or ""
-                            tf = entry.get("template_frequency") or 1.0
-                            is_anom = bool(entry.get("is_anomaly") or entry.get("suspicious"))
-                            ts = parse_timestamp(entry.get("orig_timestamp") or entry.get("timestamp") or entry.get("first_seen"))
-                            d = agg[device]
-                            d["total_events"] += 1
-                            try:
-                                d["sum_template_frequency"] += float(tf)
-                            except Exception:
-                                d["sum_template_frequency"] += 0.0
-                            d["anomaly_count"] += 1 if is_anom else 0
-                            if tmpl:
-                                d["templates_counter"][tmpl] += 1
-                            if ts:
-                                if d["earliest_ts"] is None or ts < d["earliest_ts"]:
-                                    d["earliest_ts"] = ts
-                                if d["latest_ts"] is None or ts > d["latest_ts"]:
-                                    d["latest_ts"] = ts
-                except Exception:
-                    continue
-            else:
-                continue
+            miner.load_state()
+            log.debug(f"Drain3 state loaded successfully from {state_file}")
         except Exception as e:
-            print(f"[WARN] Error processing {p}: {e}")
+            log.error(f"Failed to load Drain3 state from {state_file}: {e}")
+    return miner
 
-    output_dir = base_dir / "extracted_features"
-    output_dir.mkdir(parents=True, exist_ok=True)
+def enrich_log_with_drain3(line, miner, seen):
+    log.debug(f"Processing log line: {line.strip()}")
+    cleaned = clean_log_line(line)
+    timestamp = extract_timestamp(line)
+    result = miner.add_log_message(cleaned)
 
-    combined_file = output_dir / "combined_features.csv"
-    write_features_csv(combined_file, agg)
-    print(f"Wrote combined features to: {combined_file}")
+    if not result:
+        log.debug("No template generated for the log line.")
+        return None
 
-    write_device_features(output_dir, agg)
-    print(f"Wrote per-device features to: {output_dir}")
+    tpl_id = result["cluster_id"]
+    reason = "new template" if tpl_id not in seen else "count increased"
 
+    # Extract log level and level text
+    log_level_match = re.search(r'(INFO|DEBUG|ERROR|WARN|CRITICAL)', line, re.IGNORECASE)
+    log_level = log_level_match.group(0).upper() if log_level_match else "UNKNOWN"
+    log_level_text = f"Log level detected: {log_level}" if log_level != "UNKNOWN" else "Log level not detected"
+
+    if tpl_id not in seen:
+        seen[tpl_id] = {
+            "count": 1,
+            "first_seen": timestamp,
+            "last_seen": timestamp,
+            "sample_log": line.strip()
+        }
+        log.debug(f"New template added: {tpl_id}")
+    else:
+        seen[tpl_id]["count"] += 1
+        seen[tpl_id]["last_seen"] = timestamp
+        log.debug(f"Updated template: {tpl_id}, count: {seen[tpl_id]['count']}")
+
+    enriched = {
+        "template_id": tpl_id,
+        "template": result["template_mined"],
+        "count": seen[tpl_id]["count"],
+        "first_seen": seen[tpl_id]["first_seen"],
+        "last_seen": seen[tpl_id]["last_seen"],
+        "reason": reason,
+        "sample_log": seen[tpl_id].get("sample_log"),
+        "log_level": log_level,  # Add log level
+        "log_level_text": log_level_text,  # Add log level text
+        "device_id": os.getenv("DEVICE_ID")  # Add device_id from environment
+    }
+    return enriched
+
+def write_to_files(enriched, delta_path, full_path, seen):
+    """Write enriched logs to delta and full files, updating only necessary fields in drain.jsonl."""
+    # Define the maximum size for the delta file (in bytes)
+    MAX_DELTA_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+    # Write to delta file (always append new entries)
+    with open(delta_path, "a", encoding="utf-8") as delta_f:
+        delta_f.write(json.dumps(enriched) + "\n")
+
+    # Check and truncate the delta file if it exceeds the maximum size
+    if os.path.getsize(delta_path) > MAX_DELTA_FILE_SIZE:
+        with open(delta_path, "r", encoding="utf-8") as delta_f:
+            lines = delta_f.readlines()
+        # Keep only the most recent entries within the size limit
+        with open(delta_path, "w", encoding="utf-8") as delta_f:
+            current_size = 0
+            for line in reversed(lines):
+                line_size = len(line.encode("utf-8"))
+                if current_size + line_size <= MAX_DELTA_FILE_SIZE:
+                    delta_f.write(line)
+                    current_size += line_size
+                else:
+                    break
+
+    # Update drain.jsonl with only updated fields for existing templates
+    updated_templates = {}
+    if os.path.exists(full_path):
+        with open(full_path, "r", encoding="utf-8") as full_f:
+            for line in full_f:
+                try:
+                    entry = json.loads(line.strip())
+                    tpl_id = entry.get("template_id")
+                    if tpl_id in seen:
+                        # Update only the count and last_seen fields for existing templates
+                        entry["count"] = seen[tpl_id]["count"]
+                        entry["last_seen"] = seen[tpl_id]["last_seen"]
+                    updated_templates[tpl_id] = entry
+                except json.JSONDecodeError:
+                    continue
+
+    # Add the new enriched entry if it's a new template
+    tpl_id = enriched["template_id"]
+    if tpl_id not in updated_templates:
+        updated_templates[tpl_id] = enriched
+
+    # Write back the updated drain.jsonl
+    with open(full_path, "w", encoding="utf-8") as full_f:
+        for entry in updated_templates.values():
+            full_f.write(json.dumps(entry) + "\n")
+
+def ensure_drain_jsonl_complete(seen, full_path):
+    """Ensure that drain.jsonl includes all templates from seen_templates.json."""
+    log.debug("Starting ensure_drain_jsonl_complete.")
+    updated_templates = {}
+
+    # Load existing entries from drain.jsonl
+    if os.path.exists(full_path):
+        log.debug(f"Loading existing entries from {full_path}.")
+        with open(full_path, "r", encoding="utf-8") as full_f:
+            for line in full_f:
+                try:
+                    entry = json.loads(line.strip())
+                    tpl_id = entry.get("template_id")
+                    updated_templates[tpl_id] = entry
+                except json.JSONDecodeError:
+                    log.warning(f"Skipping invalid JSON line in {full_path}: {line.strip()}")
+
+    # Validate and add missing templates from seen_templates.json
+    missing_templates = 0
+    for tpl_id, template_data in seen.items():
+        log.debug(f"Processing template_id: {tpl_id}")
+        if not all(key in template_data for key in ["count", "first_seen", "last_seen", "sample_log"]):
+            log.warning(f"Template_id {tpl_id} is missing required fields in seen_templates.json: {template_data}")
+            continue
+
+        if tpl_id not in updated_templates:
+            log.debug(f"Adding missing template_id: {tpl_id} to drain.jsonl.")
+            updated_templates[tpl_id] = {
+                "template_id": tpl_id,
+                "template": template_data.get("template", "<MISSING_TEMPLATE>"),
+                "count": template_data["count"],
+                "first_seen": template_data["first_seen"],
+                "last_seen": template_data["last_seen"],
+                "sample_log": template_data["sample_log"],
+                "reason": "from seen_templates",
+                "log_level": "UNKNOWN",
+                "log_level_text": "Log level not detected",
+                "device_id": os.getenv("DEVICE_ID")
+            }
+            missing_templates += 1
+        else:
+            log.debug(f"Template_id: {tpl_id} already exists in drain.jsonl.")
+
+    # Write back the updated drain.jsonl
+    log.debug(f"Writing updated templates to {full_path}.")
+    with open(full_path, "w", encoding="utf-8") as full_f:
+        for entry in updated_templates.values():
+            full_f.write(json.dumps(entry) + "\n")
+
+    log.info(f"ensure_drain_jsonl_complete completed. Total templates in seen_templates.json: {len(seen)}, Total templates written to drain.jsonl: {len(updated_templates)}, Missing templates added: {missing_templates}.")
+
+# --- Watchdog Event Handler ---
+class LogHandler(FileSystemEventHandler):
+    def __init__(self, miner, seen, delta_path, full_path):
+        self.miner = miner
+        self.seen = seen
+        self.delta_path = delta_path
+        self.full_path = full_path
+
+    def on_modified(self, event):
+        if event.is_directory or CONFIG["name_contains"] not in event.src_path.lower():
+            return
+        try:
+            with open(event.src_path, "r", errors="ignore") as f:
+                for line in f:
+                    enriched = enrich_log_with_drain3(line, self.miner, self.seen)
+                    if enriched:
+                        write_to_files(enriched, self.delta_path, self.full_path, self.seen)
+            save_seen(CONFIG["seen_file"], self.seen)
+        except Exception as e:
+            log.error(f"Error processing file {event.src_path}: {e}")
+
+def initial_scan(log_dirs, miner, seen, delta_path, full_path):
+    """Process all existing log files in the specified directories."""
+    for log_dir in log_dirs:
+        if not os.path.exists(log_dir):
+            log.warning(f"Log directory does not exist: {log_dir}")
+            continue
+        for root, _, files in os.walk(log_dir):
+            for file in files:
+                if CONFIG["name_contains"] in file.lower():
+                    file_path = os.path.join(root, file)
+                    if not os.access(file_path, os.R_OK):
+                        log.warning(f"Cannot access file: {file_path}")
+                        continue
+                    try:
+                        with open(file_path, "r", errors="ignore") as f:
+                            for line in f:
+                                enriched = enrich_log_with_drain3(line, miner, seen)
+                                if enriched:
+                                    write_to_files(enriched, delta_path, full_path, seen)
+                    except Exception as e:
+                        log.error(f"Error processing file {file_path} during initial scan: {e}")
+    save_seen(CONFIG["seen_file"], seen)
+
+# --- Main ---
+def main():
+    seen = load_seen(CONFIG["seen_file"])
+    miner = build_miner(os.path.join(CONFIG["base_output"], "drain_state.json"))
+
+    # Perform an initial scan of existing log files
+    log.info("Starting initial scan of existing log files.")
+    initial_scan(CONFIG["log_dirs"], miner, seen, CONFIG["delta_file"], CONFIG["full_file"])
+    log.info("Initial scan completed. Ensuring drain.jsonl is complete.")
+
+    # Ensure drain.jsonl includes all templates from seen_templates.json
+    ensure_drain_jsonl_complete(seen, CONFIG["full_file"])
+    log.info("drain.jsonl is now complete. Starting watchdog observer.")
+
+    # Start the watchdog observer
+    event_handler = LogHandler(miner, seen, CONFIG["delta_file"], CONFIG["full_file"])
+    observer = Observer()
+    for log_dir in CONFIG["log_dirs"]:
+        observer.schedule(event_handler, log_dir, recursive=True)
+    observer.start()
+    log.info("Watchdog observer started with Drain3. Monitoring log directories.")
+    try:
+        observer.join()
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
 
 if __name__ == "__main__":
-    import sys
-    arg = sys.argv[1] if len(sys.argv) > 1 else None
-    main(arg)
+    main()
