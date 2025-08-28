@@ -45,6 +45,16 @@ logging.basicConfig(
 )
 log = logging.getLogger("drain3_runner")
 
+ignored_files_log_path = os.path.join(CONFIG["base_output"], "ignored_files.log")
+ignored_files_handler = logging.FileHandler(ignored_files_log_path, mode="w", encoding="utf-8")
+ignored_files_handler.setLevel(logging.INFO)
+ignored_files_logger = logging.getLogger("ignored_files")
+ignored_files_logger.addHandler(ignored_files_handler)
+ignored_files_logger.propagate = False
+
+# --- Global Skip List ---
+skipped_files = set()
+
 # --- Utility Functions ---
 def load_seen(path):
     try:
@@ -63,19 +73,24 @@ def clean_log_line(line):
 
 def extract_timestamp(line):
     try:
-        match = re.search(r'(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})', line)
+        # Enhanced regex to capture more timestamp formats
+        match = re.search(r'(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[-+]\d{2}:?\d{2})?)', line)
         if match:
             ts = datetime.fromisoformat(match.group(1).replace(' ', 'T'))
             return ts.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
-    except:
-        pass
+        else:
+            log.warning(f"No valid timestamp found in log line: {line.strip()}")
+    except Exception as e:
+        log.error(f"Error extracting timestamp from log line: {line.strip()} - {e}")
+
+    # Default to current UTC time if no timestamp is found
     return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
 # --- Drain3 Setup ---
 def build_miner(state_file):
     cfg = TemplateMinerConfig()
-    cfg.similarity = 0.5
-    cfg.depth = 5
+    cfg.similarity = 0.4  # Reduced similarity for better clustering
+    cfg.depth = 6  # Increased depth for more detailed clustering
     miner = TemplateMiner(FilePersistence(state_file), cfg)
     if os.path.exists(state_file):
         try:
@@ -85,8 +100,13 @@ def build_miner(state_file):
             log.error(f"Failed to load Drain3 state from {state_file}: {e}")
     return miner
 
-def enrich_log_with_drain3(line, miner, seen):
+def enrich_log_with_drain3(line, miner, seen, source_file):
     log.debug(f"Processing log line: {line.strip()}")
+
+    # Log a warning for lines without log levels but do not exclude them
+    if not re.search(r'(INFO|DEBUG|ERROR|WARN|CRITICAL)', line, re.IGNORECASE):
+        log.warning(f"Log line missing log level: {line.strip()}")
+
     cleaned = clean_log_line(line)
     timestamp = extract_timestamp(line)
     result = miner.add_log_message(cleaned)
@@ -108,7 +128,8 @@ def enrich_log_with_drain3(line, miner, seen):
             "count": 1,
             "first_seen": timestamp,
             "last_seen": timestamp,
-            "sample_log": line.strip()
+            "sample_log": line.strip(),
+            "source": source_file  # Use the provided source file path
         }
         log.debug(f"New template added: {tpl_id}")
     else:
@@ -240,40 +261,62 @@ class LogHandler(FileSystemEventHandler):
         self.full_path = full_path
 
     def on_modified(self, event):
-        if event.is_directory or CONFIG["name_contains"] not in event.src_path.lower():
+        # Ensure the event source is a file, not a directory
+        if not os.path.isfile(event.src_path):
+            log.warning(f"Skipped processing directory: {event.src_path}")
             return
+
+        # Ensure the file has a valid extension
+        valid_extensions = (".log", ".txt")
+        if not event.src_path.endswith(valid_extensions) and not re.search(r"\.log\.\d+$", event.src_path):
+            ignored_files_logger.info(f"Excluded file: {event.src_path}")
+            return
+
         try:
+            log.info(f"Processing modified file: {event.src_path}")
             with open(event.src_path, "r", errors="ignore") as f:
                 for line in f:
-                    enriched = enrich_log_with_drain3(line, self.miner, self.seen)
+                    enriched = enrich_log_with_drain3(line, self.miner, self.seen, event.src_path)
                     if enriched:
                         write_to_files(enriched, self.delta_path, self.full_path, self.seen)
             save_seen(CONFIG["seen_file"], self.seen)
         except Exception as e:
             log.error(f"Error processing file {event.src_path}: {e}")
 
+# Modify initial_scan to remove redundant checks
 def initial_scan(log_dirs, miner, seen, delta_path, full_path):
     """Process all existing log files in the specified directories."""
-    for log_dir in log_dirs:
-        if not os.path.exists(log_dir):
-            log.warning(f"Log directory does not exist: {log_dir}")
-            continue
-        for root, _, files in os.walk(log_dir):
-            for file in files:
-                if CONFIG["name_contains"] in file.lower():
-                    file_path = os.path.join(root, file)
-                    if not os.access(file_path, os.R_OK):
-                        log.warning(f"Cannot access file: {file_path}")
-                        continue
-                    try:
-                        with open(file_path, "r", errors="ignore") as f:
-                            for line in f:
-                                enriched = enrich_log_with_drain3(line, miner, seen)
-                                if enriched:
-                                    write_to_files(enriched, delta_path, full_path, seen)
-                    except Exception as e:
-                        log.error(f"Error processing file {file_path} during initial scan: {e}")
+    valid_extensions = (".log", ".txt")  # Ensure valid extensions are consistent
+    files_to_monitor = get_files_to_monitor(log_dirs, valid_extensions)
+
+    for file_path in files_to_monitor:
+        try:
+            log.info(f"Processing file during initial scan: {file_path}")
+            with open(file_path, "r", errors="ignore") as f:
+                for line in f:
+                    enriched = enrich_log_with_drain3(line, miner, seen, file_path)
+                    if enriched:
+                        write_to_files(enriched, delta_path, full_path, seen)
+        except Exception as e:
+            log.error(f"Error processing file {file_path} during initial scan: {e}")
     save_seen(CONFIG["seen_file"], seen)
+
+def get_files_to_monitor(directories, valid_extensions):
+    """Get a list of files to monitor based on valid extensions."""
+    files_to_monitor = []
+    for directory in directories:
+        if not os.path.exists(directory):
+            log.warning(f"Directory does not exist: {directory}")
+            continue
+        for root, _, files in os.walk(directory):
+            for file in files:
+                file_path = os.path.join(root, file)
+                # Include only files with valid extensions
+                if file_path.endswith(valid_extensions) or re.search(r"\.log\.\d+$", file_path):
+                    files_to_monitor.append(file_path)
+                else:
+                    ignored_files_logger.info(f"Excluded file: {file_path}")
+    return files_to_monitor
 
 # --- Main ---
 def main():
@@ -292,10 +335,16 @@ def main():
     # Start the watchdog observer
     event_handler = LogHandler(miner, seen, CONFIG["delta_file"], CONFIG["full_file"])
     observer = Observer()
-    for log_dir in CONFIG["log_dirs"]:
-        observer.schedule(event_handler, log_dir, recursive=True)
+
+    # Get files to monitor explicitly
+    valid_extensions = (".log", ".txt")
+    files_to_monitor = get_files_to_monitor(CONFIG["log_dirs"], valid_extensions)
+
+    for file_path in files_to_monitor:
+        observer.schedule(event_handler, file_path, recursive=False)
+
     observer.start()
-    log.info("Watchdog observer started with Drain3. Monitoring log directories.")
+    log.info("Watchdog observer started with Drain3. Monitoring specific files.")
     try:
         observer.join()
     except KeyboardInterrupt:
