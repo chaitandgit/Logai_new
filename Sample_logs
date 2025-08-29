@@ -1,19 +1,4 @@
-2025-08-28 13:58:22,890 DEBUG in-event <InotifyEvent: src_path=b'/input/var/memstats/cwmp.mem', wd=3, mask=IN_CLOSE_WRITE, cookie=0, name='cwmp.mem'>
-2025-08-28 13:58:22,890 DEBUG in-event <InotifyEvent: src_path=b'/input/var/ipcstats/cwmp.stat', wd=4, mask=IN_MODIFY, cookie=0, name='cwmp.stat'>
-2025-08-28 13:58:22,891 DEBUG in-event <InotifyEvent: src_path=b'/input/var/ipcstats/cwmp.stat', wd=4, mask=IN_OPEN, cookie=0, name='cwmp.stat'>
-2025-08-28 13:58:22,892 DEBUG in-event <InotifyEvent: src_path=b'/input/var/ipcstats/cwmp.stat', wd=4, mask=IN_MODIFY, cookie=0, name='cwmp.stat'>
-2025-08-28 13:58:22,894 DEBUG in-event <InotifyEvent: src_path=b'/input/var/ipcstats/cwmp.stat', wd=4, mask=IN_CLOSE_WRITE, cookie=0, name='cwmp.stat'>
-2025-08-28 13:58:25,254 DEBUG in-event <InotifyEvent: src_path=b'/input/var/memstats/voipexe.mem', wd=3, mask=IN_MODIFY, cookie=0, name='voipexe.mem'>
-2025-08-28 13:58:25,255 DEBUG in-event <InotifyEvent: src_path=b'/input/var/memstats/voipexe.mem', wd=3, mask=IN_OPEN, cookie=0, name='voipexe.mem'>
-2025-08-28 13:58:25,256 DEBUG in-event <InotifyEvent: src_path=b'/input/var/memstats/voipexe.mem', wd=3, mask=IN_MODIFY, cookie=0, name='voipexe.mem'>
-2025-08-28 13:58:25,256 DEBUG in-event <InotifyEvent: src_path=b'/input/var/memstats/voipexe.mem', wd=3, mask=IN_CLOSE_WRITE, cookie=0, name='voipexe.mem'>
-2025-08-28 13:58:27,953 DEBUG in-event <InotifyEvent: src_path=b'/input/var/ipcstats/cwmp_conn_mon.stat', wd=4, mask=IN_MODIFY, cookie=0, name='cwmp_conn_mon.stat'>
-2025-08-28 13:58:27,955 DEBUG in-event <InotifyEvent: src_path=b'/input/var/ipcstats/cwmp_conn_mon.stat', wd=4, mask=IN_OPEN, cookie=0, name='cwmp_conn_mon.stat'>
-2025-08-28 13:58:27,955 DEBUG in-event <InotifyEvent: src_path=b'/input/var/ipcstats/cwmp_conn_mon.stat', wd=4, mask=IN_MODIFY, cookie=0, name='cwmp_conn_mon.stat'>
-2025-08-28 13:58:27,956 DEBUG in-event <InotifyEvent: src_path=b'/input/var/ipcstats/cwmp_conn_mon.stat', wd=4, mask=IN_CLOSE_WRITE, cookie=0, name='cwmp_conn_mon.stat'>
-2025-08-28 13:58:29,134 DEBUG in-event <InotifyEvent: src_path=b'/input/var/ipcstats/lhdd.stat', wd=4, mask=IN_MODIFY, cookie=0, name='lhdd.stat'>
-2025-08-28 13:58:29,135 DEBUG in-event <InotifyEvent: src_path=b'/input/var/ipcstats/sdb.stat', wd=4, mask=IN_MODIFY, cookie=0, name='sdb.stat'>
-2025-08-28 13:58:29,136 DEBUG in-event <InotifyEvent: src_path=b'/input/var/ipcstats/lhdd.stat', wd=4, mask=IN_OPEN, cookie=0, name='lhdd.stat'>
-2025-08-28 13:58:29,137 DEBUG in-event <InotifyEvent: src_path=b'/input/var/ipcstats/lhdd.stat', wd=4, mask=IN_MODIFY, cookie=0, name='lhdd.stat'>
-2025-08-28 13:58:29,137 DEBUG in-event <InotifyEvent: src_path=b'/input/var/ipcstats/lhdd.stat', wd=4, mask=IN_CLOSE_WRITE, cookie=0, name='lhdd.stat'>
-2025-08-28 13:58:29,139 DEBUG in-event <InotifyEvent: src_path=b'/input/var/ipcstats/sdb.stat', wd=4, mask=IN_OPEN, cookie=0, name='sdb.stat'>
+{"template_id": 50, "template": "<TIME> L7 ubus_proxy: ia_na_data is 2620:10d:900f:458e::2 3600 3600", "count": 16, "first_seen": "2025-08-29T01:20:09Z", "last_seen": "2025-08-29T01:20:09Z", "reason": "count increased", "sample_log": "2025-08-28T20:20:09.430334-05:00 L7 ubus_proxy: ia_na_data is 2620:10d:900f:458e::2 3600 3600", "log_level": "UNKNOWN", "log_level_text": "Log level not detected", "device_id": "D93LA9ME001025"}
+{"template_id": 51, "template": "<TIME> L6 ubus_proxy: value is NULL", "count": 16, "first_seen": "2025-08-29T01:20:09Z", "last_seen": "2025-08-29T01:20:09Z", "reason": "count increased", "sample_log": "2025-08-28T20:20:09.432827-05:00 L6 ubus_proxy: value is NULL", "log_level": "UNKNOWN", "log_level_text": "Log level not detected", "device_id": "D93LA9ME001025"}
+{"template_id": 52, "template": "<TIME> L7 ubus_proxy: ia_pd_data is 2620:10d:900f:38e0:: 60 3600 3600 1800 1800", "count": 16, "first_seen": "2025-08-29T01:20:09Z", "last_seen": "2025-08-29T01:20:09Z", "reason": "count increased", "sample_log": "2025-08-28T20:20:09.432827-05:00 L7 ubus_proxy: ia_pd_data is 2620:10d:900f:38e0:: 60 3600 3600 1800 1800", "log_level": "UNKNOWN", "log_level_text": "Log level not detected", "device_id": "D93LA9ME001025"}
+{"template_id": 53, "template": "<TIME> L7 ubus_proxy: Sending Bound Event to SDB", "count": 15, "first_seen": "2025-08-29T01:20:09Z", "last_seen": "2025-08-29T01:20:09Z", "reason": "count increased", "sample_log": "2025-08-28T20:20:09.432827-05:00 L7 ubus_proxy: Sending Bound Event to SDB", "log_level": "UNKNOWN", "log_level_text": "Log level not detected", "device_id": "D93LA9ME001025"}
