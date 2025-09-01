@@ -1,0 +1,12 @@
+elasticsearch:
+  host: "http://localhost:9200"
+  index: "logs-*"
+  query:
+    range:
+      "@timestamp":
+        gte: "now-15m"
+logai:
+  algorithm: "isolation_forest"
+  params:
+    n_estimators: 100
+    contamination: 0.05
