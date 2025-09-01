@@ -1,13 +1,37 @@
-import yaml, pandas as pd
+import os
+import re
+import yaml
+import pandas as pd
 from elasticsearch import Elasticsearch
 
-with open("config.yaml") as f:
-    cfg = yaml.safe_load(f)
+def load_config(path="config.yaml"):
+    with open(path) as f:
+        raw = f.read()
 
-es = Elasticsearch([cfg["elasticsearch"]["host"]])
-resp = es.search(index=cfg["elasticsearch"]["index"],
-                 body={"query": cfg["elasticsearch"]["query"]},
-                 size=500)
+    # Replace ${VAR} in YAML with environment values
+    pattern = re.compile(r'\$\{([^}^{]+)\}')
+    def replace_env(match):
+        env_var = match.group(1)
+        return os.environ.get(env_var, "")
+
+    resolved = pattern.sub(replace_env, raw)
+    return yaml.safe_load(resolved)
+
+cfg = load_config()
+es_cfg = cfg["elasticsearch"]
+
+# Connect to ES using environment variables (expanded from YAML)
+es = Elasticsearch(
+    [es_cfg["host"]],
+    basic_auth=(es_cfg["username"], es_cfg["password"]),
+    verify_certs=True
+)
+
+resp = es.search(
+    index=es_cfg["index"],
+    body={"query": {"range": {"@timestamp": {"gte": "now-15m"}}}},
+    size=500
+)
 
 df = pd.DataFrame([hit["_source"] for hit in resp["hits"]["hits"]])
-# pass df to LogAI / NLP
+print(df.head())
