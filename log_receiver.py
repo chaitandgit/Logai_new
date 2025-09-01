@@ -1,19 +1,13 @@
-# On your ML server
-echo '
-input:
-  type: elasticsearch
-  config:
-    host: "plantxhssrvr11.ops.e2e.labs.att.com:9200"
-    index: "log-parser"
-    username: "cg722v"
-    password: "RGStatus2025"
-    
-processing:
-  - name: anomaly_detection
-    type: isolation_forest
-    features: ["features.tpl_len", "features.var_cnt", "metadata.cluster_size"]
-' > logai_config.yaml
+import yaml, pandas as pd
+from elasticsearch import Elasticsearch
 
-# Install and run
-pip install logai
-logai --config logai_config.yaml
+with open("config.yaml") as f:
+    cfg = yaml.safe_load(f)
+
+es = Elasticsearch([cfg["elasticsearch"]["host"]])
+resp = es.search(index=cfg["elasticsearch"]["index"],
+                 body={"query": cfg["elasticsearch"]["query"]},
+                 size=500)
+
+df = pd.DataFrame([hit["_source"] for hit in resp["hits"]["hits"]])
+# pass df to LogAI / NLP
