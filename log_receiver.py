@@ -68,3 +68,18 @@ print(df.head())
 missing = [f for f in numeric_fields if f not in df.columns]
 if missing:
     print("⚠️ Missing fields in ES response:", missing)
+    
+
+numeric_fields = [
+    "features.tpl_len", "features.var_cnt", "features.tpl_complexity",
+    "features.hour", "features.msg_len", "features.word_count",
+    "metadata.cluster_size", "metadata.tpl_count"
+]
+
+for field in numeric_fields:
+    if field not in df.columns:
+        # create missing field with default (0 or NaN)
+        df[field] = 0
+    df[field] = pd.to_numeric(df[field], errors="coerce").fillna(0)
+
+
