@@ -1,28 +1,31 @@
-dataloader:
-  type: "custom"
-  source: "elasticsearch"
+# ==============================
+# Run Isolation Forest with LogAI
+# ==============================
 
-ml_training:
-  isolation_forest:
-    numerical_features:
-      - features.tpl_len
-      - features.var_cnt
-      - features.tpl_complexity
-      - features.hour
-      - features.msg_len
-      - features.word_count
-      - metadata.cluster_size
-      - metadata.tpl_count
+import pandas as pd
+from logai.applications.application import LogAI
+from logai.dataloader.opendataloader import OpenSetDataLoader
 
-    boolean_features:
-      - features.is_dynamic
-      - features.has_numbers
+# 1. Load LogAI config
+app = LogAI(config="config.yaml")
 
-    categorical_features:
-      - metadata.device_id
-      - metadata.source_file
+# 2. Load flattened CSV into LogDataset
+loader = OpenSetDataLoader(
+    dataset_name="csv_dataset",
+    dataset_path="logs_flattened.csv"   # <-- your saved file
+)
+dataset = loader.load_data()
 
-    params:
-      n_estimators: 100
-      contamination: 0.05
-      random_state: 42
+# 3. Run Isolation Forest (LogAI handles feature extraction per config.yaml)
+result = app.run(dataset)
+
+# 4. Inspect results
+print("=== First few rows with anomaly labels ===")
+print(result.head())
+
+print("\n=== Anomaly counts ===")
+print(result["anomaly_label"].value_counts())
+
+# 5. Save enriched results locally
+result.to_csv("logs_with_anomalies.csv", index=False)
+print("\nSaved results to logs_with_anomalies.csv")
