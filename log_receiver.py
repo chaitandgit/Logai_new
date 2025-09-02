@@ -65,3 +65,6 @@ for field in categorical_fields:
 
 print(df.head())
 
+missing = [f for f in numeric_fields if f not in df.columns]
+if missing:
+    print("⚠️ Missing fields in ES response:", missing)
