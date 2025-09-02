@@ -1,4 +1,119 @@
-{"template_id": 50, "template": "<TIME> L7 ubus_proxy: ia_na_data is 2620:10d:900f:458e::2 3600 3600", "count": 16, "first_seen": "2025-08-29T01:20:09Z", "last_seen": "2025-08-29T01:20:09Z", "reason": "count increased", "sample_log": "2025-08-28T20:20:09.430334-05:00 L7 ubus_proxy: ia_na_data is 2620:10d:900f:458e::2 3600 3600", "log_level": "UNKNOWN", "log_level_text": "Log level not detected", "device_id": "D93LA9ME001025"}
-{"template_id": 51, "template": "<TIME> L6 ubus_proxy: value is NULL", "count": 16, "first_seen": "2025-08-29T01:20:09Z", "last_seen": "2025-08-29T01:20:09Z", "reason": "count increased", "sample_log": "2025-08-28T20:20:09.432827-05:00 L6 ubus_proxy: value is NULL", "log_level": "UNKNOWN", "log_level_text": "Log level not detected", "device_id": "D93LA9ME001025"}
-{"template_id": 52, "template": "<TIME> L7 ubus_proxy: ia_pd_data is 2620:10d:900f:38e0:: 60 3600 3600 1800 1800", "count": 16, "first_seen": "2025-08-29T01:20:09Z", "last_seen": "2025-08-29T01:20:09Z", "reason": "count increased", "sample_log": "2025-08-28T20:20:09.432827-05:00 L7 ubus_proxy: ia_pd_data is 2620:10d:900f:38e0:: 60 3600 3600 1800 1800", "log_level": "UNKNOWN", "log_level_text": "Log level not detected", "device_id": "D93LA9ME001025"}
-{"template_id": 53, "template": "<TIME> L7 ubus_proxy: Sending Bound Event to SDB", "count": 15, "first_seen": "2025-08-29T01:20:09Z", "last_seen": "2025-08-29T01:20:09Z", "reason": "count increased", "sample_log": "2025-08-28T20:20:09.432827-05:00 L7 ubus_proxy: Sending Bound Event to SDB", "log_level": "UNKNOWN", "log_level_text": "Log level not detected", "device_id": "D93LA9ME001025"}
+{
+  "_index": "log-parser",
+  "_type": "_doc",
+  "_id": "7gtgszBHgVhNc3QS3uBD",
+  "_version": 4197,
+  "_score": 1,
+  "_source": {
+    "@timestamp": "2025-09-02T01:13:18.417100+00:00",
+    "doc_id": "7gtgszBHgVhNc3QS3uBD",
+    "features": {
+      "tpl_hash": "de8a274d097a",
+      "tpl_len": 47,
+      "var_cnt": 5,
+      "is_dynamic": true,
+      "tpl_complexity": 97,
+      "hour": 1,
+      "msg_len": 103,
+      "word_count": 9,
+      "has_numbers": true
+    },
+    "metadata": {
+      "template": "<*> L6 unbound: [26916:0] info: <*> <*> <*> <*>",
+      "tpl_hash": "de8a274d097a",
+      "cluster_size": 412,
+      "tpl_count": 412,
+      "source_file": "/input/var/unbound.log.2",
+      "device_id": "redacted_device",
+      "sample_first": "2025-09-01T20:06:49.114513 L6 unbound: [26916:0] info: resolving ntp1.sbc.net. A IN",
+      "sample_last": "2025-09-01T20:06:49.399071 L6 unbound: [26916:0] info: processQueryTargets: ntp1.sbc.net. AAAA IN",
+      "sample_not_available": false
+    }
+  },
+  "fields": {
+    "features.tpl_complexity": [
+      97
+    ],
+    "features.var_cnt": [
+      5
+    ],
+    "metadata.sample_first": [
+      "2025-09-01T20:06:49.114513 L6 unbound: [26916:0] info: resolving ntp1.sbcglobal.net. A IN"
+    ],
+    "features.tpl_len": [
+      47
+    ],
+    "metadata.template.keyword": [
+      "<*> L6 unbound: [26916:0] info: <*> <*> <*> <*>"
+    ],
+    "features.msg_len": [
+      103
+    ],
+    "metadata.sample_not_available": [
+      false
+    ],
+    "metadata.tpl_hash": [
+      "de8a274d097a"
+    ],
+    "features.has_numbers": [
+      true
+    ],
+    "metadata.source_file": [
+      "/input/var/unbound.log.2"
+    ],
+    "features.tpl_hash": [
+      "de8a274d097a"
+    ],
+    "metadata.template": [
+      "<*> L6 unbound: [26916:0] info: <*> <*> <*> <*>"
+    ],
+    "features.tpl_hash.keyword": [
+      "de8a274d097a"
+    ],
+    "metadata.device_id": [
+      "N93VB1MG005697"
+    ],
+    "features.is_dynamic": [
+      true
+    ],
+    "metadata.sample_first.keyword": [
+      "2025-09-01T20:06:49.114513 L6 unbound: [26916:0] info: resolving ntp1.sbcglobal.net. A IN"
+    ],
+    "metadata.tpl_hash.keyword": [
+      "de8a274d097a"
+    ],
+    "features.hour": [
+      1
+    ],
+    "metadata.tpl_count": [
+      412
+    ],
+    "metadata.sample_last": [
+      "2025-09-01T20:06:49.399071 L6 unbound: [26916:0] info: processQueryTargets: ntp1.net. AAAA IN"
+    ],
+    "metadata.device_id.keyword": [
+      "redacted_device"
+    ],
+    "metadata.cluster_size": [
+      412
+    ],
+    "doc_id": [
+      "7gtgszBHgVhNc3QS3uBD"
+    ],
+    "metadata.sample_last.keyword": [
+      "2025-09-01T20:06:49.399071 L6 unbound: [26916:0] info: processQueryTargets: ntp1.net. AAAA IN"
+    ],
+    "@timestamp": [
+      "2025-09-02T01:13:18.417Z"
+    ],
+    "doc_id.keyword": [
+      "7gtgszBHgVhNc3QS3uBD"
+    ],
+    "features.word_count": [
+      9
+    ],
+    "metadata.source_file.keyword": [
+      "/input/var/unbound.log.2"
+    ]
+  }
+}
