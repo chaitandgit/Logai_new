@@ -1,17 +1,13 @@
-# --------------------------------------------------------
-# Burst detection
-# --------------------------------------------------------
-df = df.sort_values("@timestamp")
-
-df["burst_count"] = (
+D:\logai-main\logai\elastic_wrapper.py:88: FutureWarning: In a future version of pandas, parsing datetimes with mixed time zones will raise an error unless `utc=True`. Please specify `utc=True` to opt in to the new behaviour and silence this warning. To create a `Series` with mixed offsets and `object` dtype, please use `apply` and `datetime.datetime.strptime`
+  df["@timestamp"] = pd.to_datetime(df["@timestamp"], errors="coerce")
+⚠️ Found 2893 invalid timestamps
+Traceback (most recent call last):
+  File "D:\logai-main\logai\elastic_wrapper.py", line 103, in <module>
     df.groupby("features.tpl_hash")
-      .rolling(window="5min", on="@timestamp")
-      .size()
-      .reset_index(level=0, drop=True)
-)
-
-# Burst flag (μ+3σ rule)
-template_stats = df.groupby("features.tpl_hash")["burst_count"].agg(["mean", "std"]).reset_index()
-template_stats["threshold"] = template_stats["mean"] + 3 * template_stats["std"]
-df = df.merge(template_stats[["features.tpl_hash", "threshold"]], on="features.tpl_hash", how="left")
-df["burst_flag"] = (df["burst_count"] > df["threshold"]).astype(int)
+  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\groupby\groupby.py", line 3885, in rolling
+    return RollingGroupby(
+  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\window\rolling.py", line 713, in __init__
+    super().__init__(obj, *args, **kwargs)
+  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\window\rolling.py", line 164, in __init__
+    raise ValueError(
+ValueError: invalid on specified as @timestamp, must be a column (of DataFrame), an Index or None
