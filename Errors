@@ -1,38 +1,20 @@
-# --------------------------------------------------------
-# 4b. Template-aware burst & sequence anomalies
-# --------------------------------------------------------
-
-# --- Burst detection ---
-# Count how many times each template appears in a sliding window
-df = df.sort_values("@timestamp")  # ensure time order
-window_size = "5min"  # adjust as needed
-
-# Rolling counts per template
-df["burst_count"] = (
+D:\logai-main\logai\elastic_wrapper.py:38: DeprecationWarning: Received 'size' via a specific parameter in the presence of a 'body' parameter, which is deprecated and will be removed in a future version. Instead, use only 'body' or only specific parameters.
+  resp = es.search(
+Traceback (most recent call last):
+  File "D:\logai-main\logai\elastic_wrapper.py", line 98, in <module>
     df.set_index(pd.to_datetime(df["@timestamp"]))
-      .groupby("features.tpl_hash")["features.tpl_hash"]
-      .transform(lambda x: x.rolling(window=window_size).count())
-)
-
-# Burst flag: template count higher than its mean + 3σ (per template)
-template_stats = df.groupby("features.tpl_hash")["burst_count"].agg(["mean", "std"]).reset_index()
-template_stats["threshold"] = template_stats["mean"] + 3 * template_stats["std"]
-df = df.merge(template_stats[["features.tpl_hash", "threshold"]], on="features.tpl_hash", how="left")
-df["burst_flag"] = (df["burst_count"] > df["threshold"]).astype(int)
-
-
-# --- Sequence mismatch detection ---
-# Encode template IDs numerically
-tpl_ids = df["features.tpl_hash"].astype("category").cat.codes
-df["tpl_id"] = tpl_ids
-
-# Build bigrams of (prev, current)
-df["tpl_prev"] = df["tpl_id"].shift(1)
-df["tpl_bigram"] = df["tpl_prev"].astype(str) + "->" + df["tpl_id"].astype(str)
-
-# Learn frequent transitions (bigrams)
-bigram_counts = df["tpl_bigram"].value_counts()
-valid_bigrams = set(bigram_counts[bigram_counts > 5].index)  # keep only frequent ones
-
-# Sequence flag: 1 if bigram not seen often before
-df["sequence_flag"] = (~df["tpl_bigram"].isin(valid_bigrams)).astype(int)
+  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\tools\datetimes.py", line 1068, in to_datetime
+    cache_array = _maybe_cache(arg, format, cache, convert_listlike)
+  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\tools\datetimes.py", line 249, in _maybe_cache
+    cache_dates = convert_listlike(unique_dates, format)
+  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\tools\datetimes.py", line 435, in _convert_listlike_datetimes
+    return _array_strptime_with_fallback(arg, name, utc, format, exact, errors)
+  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\tools\datetimes.py", line 469, in _array_strptime_with_fallback
+    result, tz_out = array_strptime(arg, fmt, exact=exact, errors=errors, utc=utc)
+  File "pandas/_libs/tslibs/strptime.pyx", line 501, in pandas._libs.tslibs.strptime.array_strptime
+  File "pandas/_libs/tslibs/strptime.pyx", line 451, in pandas._libs.tslibs.strptime.array_strptime
+  File "pandas/_libs/tslibs/strptime.pyx", line 583, in pandas._libs.tslibs.strptime._parse_with_format
+ValueError: time data "2025-08-22T15:11:17.577867" doesn't match format "%Y-%m-%dT%H:%M:%S.%f%z", at position 18. You might want to try:
+    - passing `format` if your strings have a consistent format;
+    - passing `format='ISO8601'` if your strings are all ISO8601 but not necessarily in exactly the same format;
+    - passing `format='mixed'`, and the format will be inferred for each element individually. You might want to use `dayfirst` alongside this.
