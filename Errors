@@ -95,3 +95,21 @@ df["anomaly_label"] = labels
 # Optional: per-feature reconstruction error (to explain WHY)
 error_df = pd.DataFrame(errors, columns=numerical_features)
 df = pd.concat([df, error_df.add_prefix("recon_err_")], axis=1)
+
+implement this but on csv first once satisfied can send back to es
+
+# --- After you train + run AutoEncoderDetector ---
+scores, errors = detector.decision_function(X)
+labels = detector.predict(X)
+
+# Add anomaly score & label
+df["anomaly_score_autoencoder"] = scores
+df["anomaly_label_autoencoder"] = labels
+
+# Add per-feature reconstruction errors (the WHY)
+error_df = pd.DataFrame(errors, columns=numerical_features)
+df = pd.concat([df, error_df.add_prefix("recon_err_")], axis=1)
+
+print("=== Sample anomaly explanations ===")
+print(df.loc[df["anomaly_label_autoencoder"] == 1,
+             ["anomaly_score_autoencoder"] + [c for c in df.columns if c.startswith("recon_err_")]].head())
