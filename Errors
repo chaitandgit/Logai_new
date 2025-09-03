@@ -1,9 +1,10 @@
-# Robust datetime parsing
-df["@timestamp"] = pd.to_datetime(df["@timestamp"], errors="coerce", format="mixed")
-
-df = df.set_index(df["@timestamp"])  # safe indexing
-df["burst_count"] = (
-    df.groupby("features.tpl_hash")["features.tpl_hash"]
-      .transform(lambda x: x.rolling(window=window_size).count())
-)
-df = df.reset_index(drop=True)  # reset after burst calc
+D:\logai-main\logai\elastic_wrapper.py:88: FutureWarning: In a future version of pandas, parsing datetimes with mixed time zones will raise an error unless `utc=True`. Please specify `utc=True` to opt in to the new behaviour and silence this warning. To create a `Series` with mixed offsets and `object` dtype, please use `apply` and `datetime.datetime.strptime`
+  df["@timestamp"] = pd.to_datetime(df["@timestamp"], errors="coerce", format="mixed")
+Traceback (most recent call last):
+  File "D:\logai-main\logai\elastic_wrapper.py", line 89, in <module>
+    df = df.sort_values("@timestamp").set_index(df["@timestamp"])
+  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\frame.py", line 7207, in sort_values
+    indexer = nargsort(
+  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\sorting.py", line 439, in nargsort
+    indexer = non_nan_idx[non_nans.argsort(kind=kind)]
+TypeError: can't compare offset-naive and offset-aware datetimes
