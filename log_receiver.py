@@ -56,6 +56,17 @@ flattened_records = [flatten_dict(hit["_source"]) for hit in resp["hits"]["hits"
 df = pd.DataFrame(flattened_records)
 
 # --------------------------------------------------------
+# 3b. Ensure features.tpl_hash exists
+# --------------------------------------------------------
+if "features.tpl_hash" not in df.columns:
+    if "metadata.tpl_hash" in df.columns:
+        df["features.tpl_hash"] = df["metadata.tpl_hash"]
+        print("ℹ️ Using metadata.tpl_hash as features.tpl_hash")
+    else:
+        df["features.tpl_hash"] = "unknown_tpl"
+        print("⚠️ No tpl_hash found, assigning 'unknown_tpl'")
+
+# --------------------------------------------------------
 # 4. Robust timestamp parsing
 # --------------------------------------------------------
 def safe_parse(ts):
@@ -235,24 +246,35 @@ df["anomaly_label_autoencoder"] = labels_ae
 error_df = pd.DataFrame(errors_ae, columns=feature_cols_ae)
 df = pd.concat([df, error_df.add_prefix("recon_err_")], axis=1)
 
+# --------------------------------------------------------
+# 10. Explanations (AutoEncoder + Burst + Sequence)
+# --------------------------------------------------------
 def explain_row(row):
-    recon_err_cols = [c for c in df.columns if c.startswith("recon_err_")]
-    if not recon_err_cols:
-        return "No explanation available"
-    top_feat = max(recon_err_cols, key=lambda c: row[c])
-    return f"Unusual {top_feat.replace('recon_err_', '')}: value {row[top_feat.replace('recon_err_', '')]}, reconstruction error high"
+    reasons = []
 
-df["explanation_text"] = df.apply(
-    lambda r: explain_row(r) if r["anomaly_label_autoencoder"] == 1 else "",
-    axis=1
-)
+    if row.get("anomaly_label_autoencoder", 0) == 1:
+        recon_err_cols = [c for c in df.columns if c.startswith("recon_err_")]
+        if recon_err_cols:
+            top_feat = max(recon_err_cols, key=lambda c: row[c])
+            feat_name = top_feat.replace("recon_err_", "")
+            reasons.append(f"Autoencoder: unusual {feat_name} (value={row[feat_name]})")
+
+    if row.get("burst_flag", 0) == 1:
+        reasons.append(f"Burst: template {row.get('features.tpl_hash')} exceeded threshold {row.get('threshold')}")
+
+    if row.get("sequence_flag", 0) == 1:
+        reasons.append(f"Sequence: unexpected transition {row.get('tpl_bigram')}")
+
+    return " | ".join(reasons) if reasons else ""
+
+df["explanation_text"] = df.apply(explain_row, axis=1)
 
 print("=== Sample anomaly explanations ===")
-print(df.loc[df["anomaly_label_autoencoder"] == 1,
+print(df.loc[df["explanation_text"] != "",
              ["anomaly_score_autoencoder", "explanation_text"]].head())
 
 # --------------------------------------------------------
-# 10. Ensemble
+# 11. Ensemble
 # --------------------------------------------------------
 df["anomaly_label_iforest"] = (df["anomaly_label_iforest"] == -1).astype(int)
 df["anomaly_label_autoencoder"] = (df["anomaly_label_autoencoder"] == 1).astype(int)
@@ -265,7 +287,7 @@ print("\n=== Anomaly counts ===")
 print(df[["anomaly_label_iforest", "anomaly_label_autoencoder", "anomaly_label_ensemble"]].value_counts())
 
 # --------------------------------------------------------
-# 11. Save results
+# 12. Save results
 # --------------------------------------------------------
 cols_to_exclude = [f"recon_err_{col}" for col in feature_cols_ae]
 output_cols = [c for c in df.columns if c not in cols_to_exclude]
