@@ -1,0 +1,30 @@
+PS C:\Users\cg722v\Miniconda3\envs\logai310\Lib\site-packages\logai> python elasticsearch_wrapper.py
+Traceback (most recent call last):
+  File "C:\Users\cg722v\Miniconda3\envs\logai310\Lib\site-packages\logai\elasticsearch_wrapper.py", line 6, in <module>
+    from logai.applications.log_anomaly_detection import LogAnomalyDetection
+  File "C:\Users\cg722v\AppData\Local\Programs\Python\Python311\Lib\site-packages\logai\applications\log_anomaly_detection.py", line 12, in <module>
+    from logai.analysis.anomaly_detector import AnomalyDetector, AnomalyDetectionConfig
+  File "C:\Users\cg722v\AppData\Local\Programs\Python\Python311\Lib\site-packages\logai\analysis\anomaly_detector.py", line 9, in <module>
+    import logai.algorithms.anomaly_detection_algo
+  File "C:\Users\cg722v\AppData\Local\Programs\Python\Python311\Lib\site-packages\logai\algorithms\anomaly_detection_algo\__init__.py", line 8, in <module>
+    from .dbl import DBLDetector
+  File "C:\Users\cg722v\AppData\Local\Programs\Python\Python311\Lib\site-packages\logai\algorithms\anomaly_detection_algo\dbl.py", line 16, in <module>
+    from logai.algorithms.algo_interfaces import AnomalyDetectionAlgo
+  File "C:\Users\cg722v\AppData\Local\Programs\Python\Python311\Lib\site-packages\logai\algorithms\algo_interfaces.py", line 11, in <module>
+    from logai.dataloader.data_model import LogRecordObject      
+  File "C:\Users\cg722v\AppData\Local\Programs\Python\Python311\Lib\site-packages\logai\dataloader\data_model.py", line 17, in <module>
+    @dataclass
+     ^^^^^^^^^
+  File "C:\Users\cg722v\AppData\Local\Programs\Python\Python311\Lib\dataclasses.py", line 1220, in dataclass
+    return wrap(cls)
+           ^^^^^^^^^
+  File "C:\Users\cg722v\AppData\Local\Programs\Python\Python311\Lib\dataclasses.py", line 1210, in wrap
+    return _process_class(cls, init, repr, eq, order, unsafe_hash,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cg722v\AppData\Local\Programs\Python\Python311\Lib\dataclasses.py", line 958, in _process_class
+    cls_fields.append(_get_field(cls, name, type, kw_only))      
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^       
+  File "C:\Users\cg722v\AppData\Local\Programs\Python\Python311\Lib\dataclasses.py", line 815, in _get_field
+    raise ValueError(f'mutable default {type(f.default)} for field '
+ValueError: mutable default <class 'pandas.core.frame.DataFrame'> for field timestamp is not allowed: use default_factory
+PS C:\Users\cg722v\Miniconda3\envs\logai310\Lib\site-packages\logai>
