@@ -1,24 +1,81 @@
+# --------------------------------------------------------
+# 5b. OpenWrt-aware log level extraction + mismatch
+# --------------------------------------------------------
 def extract_level_info_openwrt(row):
-    text = str(
-        row.get("metadata.template")
-        or row.get("metadata.sample_first")
-        or row.get("metadata.sample_last")
-        or row.get("message", "")
-    )
+    """
+    Extract log level info for OpenWrt/BusyBox logs.
+    - Prefer textual levels (critical, error, etc.)
+    - Fall back to device-specific L0..L7
+    - Flag mismatch if sample_first != sample_last
+    """
+    mismatch_flag = 0
 
-    # 1. Prefer textual log levels if present
+    # Step 1: prefer template
+    if pd.notna(row.get("metadata.template")) and row["metadata.template"]:
+        text = str(row["metadata.template"])
+    # Step 2: sample_first vs sample_last
+    elif pd.notna(row.get("metadata.sample_first")) and pd.notna(row.get("metadata.sample_last")):
+        if row["metadata.sample_first"] == row["metadata.sample_last"]:
+            text = str(row["metadata.sample_first"])
+        else:
+            mismatch_flag = 1
+            text = str(row["metadata.sample_first"])  # still parse something
+    # Step 3: fallback to whatever is available
+    else:
+        text = str(
+            row.get("metadata.sample_first")
+            or row.get("metadata.sample_last")
+            or row.get("message", "")
+        )
+
+    # Prefer textual severity words
     m = re.search(r"\b(debug|info|warn|error|critical|notice|trace)\b", text, re.IGNORECASE)
     if m:
-        return "Unknown", m.group(1).capitalize()
+        return pd.Series(["Unknown", m.group(1).capitalize(), mismatch_flag])
 
-    # 2. Otherwise fall back to device-specific L0..L7
+    # Otherwise match L0..L7
     m = re.search(r"\bL([0-7])\b", text)
     if m:
         lnum = m.group(1)
-        return f"L{lnum}", f"DeviceLevel{lnum}"
+        return pd.Series([f"L{lnum}", f"DeviceLevel{lnum}", mismatch_flag])
 
-    # 3. Nothing found
-    return "Unknown", "Unknown"
+    # Nothing found
+    return pd.Series(["Unknown", "Unknown", mismatch_flag])
+
 
 # Apply to dataframe
-df[["log_level_code", "log_level_text"]] = df.apply(extract_level_info_openwrt, axis=1)
+df[["log_level_code", "log_level_text", "log_level_mismatch"]] = df.apply(
+    extract_level_info_openwrt, axis=1
+)
+
+
+# --------------------------------------------------------
+# 10. Explanations (AutoEncoder + Burst + Sequence + Mismatch)
+# --------------------------------------------------------
+def explain_row(row):
+    reasons = []
+
+    # Autoencoder reconstruction errors
+    if row.get("anomaly_label_autoencoder", 0) == 1:
+        recon_err_cols = [c for c in df.columns if c.startswith("recon_err_")]
+        if recon_err_cols:
+            top_feat = max(recon_err_cols, key=lambda c: row[c])
+            feat_name = top_feat.replace("recon_err_", "")
+            reasons.append(f"Autoencoder: unusual {feat_name} (value={row[feat_name]})")
+
+    # Burst anomalies
+    if row.get("burst_flag", 0) == 1:
+        reasons.append(f"Burst: template {row.get('features.tpl_hash')} exceeded threshold {row.get('threshold')}")
+
+    # Sequence anomalies
+    if row.get("sequence_flag", 0) == 1:
+        reasons.append(f"Sequence: unexpected transition {row.get('tpl_bigram')}")
+
+    # Template mismatch flag
+    if row.get("log_level_mismatch", 0) == 1:
+        reasons.append("Mismatch: sample_first vs sample_last differ")
+
+    return " | ".join(reasons) if reasons else ""
+
+
+df["explanation_text"] = df.apply(explain_row, axis=1)
