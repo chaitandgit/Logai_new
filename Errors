@@ -1,4 +1,24 @@
-2025-08-22T15:11:17.580632 L0 kernel: [ 1.182202] bcm_tcp_task created successfully with budget 256 ,cpumask:0x6
+def extract_level_info_openwrt(row):
+    text = str(
+        row.get("metadata.template")
+        or row.get("metadata.sample_first")
+        or row.get("metadata.sample_last")
+        or row.get("message", "")
+    )
 
+    # 1. Prefer textual log levels if present
+    m = re.search(r"\b(debug|info|warn|error|critical|notice|trace)\b", text, re.IGNORECASE)
+    if m:
+        return "Unknown", m.group(1).capitalize()
 
-(handle_resource_transition_critical)
+    # 2. Otherwise fall back to device-specific L0..L7
+    m = re.search(r"\bL([0-7])\b", text)
+    if m:
+        lnum = m.group(1)
+        return f"L{lnum}", f"DeviceLevel{lnum}"
+
+    # 3. Nothing found
+    return "Unknown", "Unknown"
+
+# Apply to dataframe
+df[["log_level_code", "log_level_text"]] = df.apply(extract_level_info_openwrt, axis=1)
