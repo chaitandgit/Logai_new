@@ -84,12 +84,16 @@ else:
 # --------------------------------------------------------
 # 4b. Burst & sequence anomalies
 # --------------------------------------------------------
-# Robust datetime parsing
-df["@timestamp"] = pd.to_datetime(df["@timestamp"], errors="coerce", format="mixed")
-df = df.sort_values("@timestamp").set_index(df["@timestamp"])
+# Trust @timestamp from ES
+df["@timestamp"] = pd.to_datetime(df["@timestamp"], errors="coerce")
+
+if df["@timestamp"].isna().any():
+    print(f"⚠️ Found {df['@timestamp'].isna().sum()} invalid timestamps")
+
+df = df.sort_values("@timestamp").set_index("@timestamp")
 window_size = "5min"
 
-# Burst count per template
+# Burst detection
 df["burst_count"] = (
     df.groupby("features.tpl_hash")["features.tpl_hash"]
       .transform(lambda x: x.rolling(window=window_size).count())
