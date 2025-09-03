@@ -1,12 +1,24 @@
-elasticsearch:
-  host: "http://localhost:9200"
-  index: "logs-*"
-  query:
-    range:
-      "@timestamp":
-        gte: "now-15m"
-logai:
-  algorithm: "isolation_forest"
-  params:
-    n_estimators: 100
-    contamination: 0.05
+ml_training:
+  autoencoder:
+    numerical_features:
+      - features.tpl_len
+      - features.var_cnt
+      - features.tpl_complexity
+      - features.hour
+      - features.msg_len
+      - features.word_count
+      - metadata.cluster_size
+      - metadata.tpl_count
+    boolean_features:
+      - features.is_dynamic
+      - features.has_numbers
+    categorical_features:
+      - metadata.device_id
+      - metadata.source_file
+    params:
+      hidden_dim: 16        # size of hidden layer
+      latent_dim: 8         # bottleneck dimension
+      learning_rate: 0.001
+      batch_size: 32
+      num_epochs: 20
+      contamination: 0.05   # fraction of anomalies expected
