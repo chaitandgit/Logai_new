@@ -1,31 +1,10 @@
-# Match custom "L1..L7" patterns (edge device style)
-custom_level_match = re.search(r"\bL([0-7])\b", msg)
+My logic is extract it (Supposed to be L1 and Alert)
+from 
+metadata.template ---- 1969-12-31T18:01:00.125592-06:00 L1 amx-processmonitor: File not found /data/system/prpl/config/amx/amx-processmonitor/amx-processmonitor_config.odl if available
+If it is not available in template
+Try from
+match both 
+metadata.sample_first	metadata.sample_last if matched, use it, else use "mismatch"
+If not available in any of the above, parse from the any of the above text itself
+sample log: (handle_resource_transition_critical)
 
-# Match standalone RFC5424 digits (not part of timestamps)
-rfc_num_match = re.search(r"\b([0-7])\b(?!\d)", msg)
-
-def extract_rfc5424_and_loglevel(msg):
-    rfc5424_map = {
-        "0": "Emergency", "1": "Alert", "2": "Critical", "3": "Error",
-        "4": "Warning", "5": "Notice", "6": "Informational", "7": "Debug"
-    }
-
-    # Match "L1".."L7" explicitly
-    custom_level_match = re.search(r"\bL([0-7])\b", msg)
-
-    # Match RFC5424 digit (only if it's standalone, not inside timestamp)
-    rfc_num_match = re.search(r"(?<!\d)([0-7])(?!\d)", msg)
-
-    # Match textual loglevels
-    loglevel_match = re.search(r"\b(debug|info|warn|error|critical|notice|trace)\b", msg, re.IGNORECASE)
-
-    if custom_level_match:
-        val = custom_level_match.group(1)
-        return val, rfc5424_map.get(val, "Unknown")
-    elif rfc_num_match:
-        val = rfc_num_match.group(1)
-        return val, rfc5424_map.get(val, "Unknown")
-    elif loglevel_match:
-        return "Unknown", loglevel_match.group(1).capitalize()
-    else:
-        return "Unknown", "Unknown"
