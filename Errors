@@ -1,23 +1,23 @@
-(logai-py310) PS D:\logai-main\logai> $env:ES_USERNAME="cg722v"; $env:ES_PASSWORD="RGStatus2025"; python .\elastic_wrapper.py
-Traceback (most recent call last):
-  File "D:\logai-main\logai\elastic_wrapper.py", line 99, in <module>
-    .transform(lambda x: x.rolling(window=window_size).count())
-  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\groupby\generic.py", line 517, in transform
-    return self._transform(
-  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\groupby\groupby.py", line 2027, in _transform
-    return self._transform_general(func, engine, engine_kwargs, *args, **kwargs)
-  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\groupby\generic.py", line 557, in _transform_general
-    res = func(group, *args, **kwargs)
-  File "D:\logai-main\logai\elastic_wrapper.py", line 99, in <lambda>
-    .transform(lambda x: x.rolling(window=window_size).count())
-  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\generic.py", line 12599, in rolling
-    return Rolling(
-  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\window\rolling.py", line 170, in __init__
-    self._validate()
-  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\window\rolling.py", line 1877, in _validate
-    self._validate_datetimelike_monotonic()
-  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\window\rolling.py", line 1922, in _validate_datetimelike_monotonic
-    self._raise_monotonic_error("values must not have NaT")
-  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\window\rolling.py", line 1933, in _raise_monotonic_error
-    raise ValueError(f"{on} {msg}")
-ValueError: index values must not have NaT
+# Robust datetime parsing, force UTC
+df["@timestamp"] = pd.to_datetime(df["@timestamp"], errors="coerce", utc=True)
+
+# Handle invalid timestamps
+bad_ts = df["@timestamp"].isna().sum()
+if bad_ts > 0:
+    print(f"⚠️ Dropping {bad_ts} rows with invalid timestamps")
+    df = df.dropna(subset=["@timestamp"])
+
+df = df.sort_values("@timestamp").set_index("@timestamp")
+window_size = "5min"
+
+# Burst count per template
+df["burst_count"] = (
+    df.groupby("features.tpl_hash")["features.tpl_hash"]
+      .transform(lambda x: x.rolling(window=window_size).count())
+)
+
+# Burst flag (μ+3σ rule)
+template_stats = df.groupby("features.tpl_hash")["burst_count"].agg(["mean", "std"]).reset_index()
+template_stats["threshold"] = template_stats["mean"] + 3 * template_stats["std"]
+df = df.merge(template_stats[["features.tpl_hash", "threshold"]], on="features.tpl_hash", how="left")
+df["burst_flag"] = (df["burst_count"] > df["threshold"]).astype(int)
