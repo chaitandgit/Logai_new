@@ -1,1 +1,2 @@
-ERROR: Could not install packages due to an OSError: [Errno 2] No such file or directory: 'c:\\users\\cg722v\\miniconda3\\envs\\logai310\\lib\\site-packages\\packaging-25.0.dist-info\\METADATA' 
+pip uninstall logai
+pip install git+https://github.com/salesforce/LogAI.git
