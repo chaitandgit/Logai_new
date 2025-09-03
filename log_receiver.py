@@ -99,11 +99,31 @@ df["extracted_code"], df["extracted_text"] = zip(*df.apply(extract_code_and_text
 df["template_mismatch_flag"] = df.apply(check_mismatch, axis=1)
 
 def extract_rfc5424_and_loglevel(msg):
-    rfc_match = re.search(r"\b([A-Z][0-9])\b", msg)
+    # Map RFC5424 numeric levels to names
+    rfc5424_map = {
+        "0": "Emergency", "1": "Alert", "2": "Critical", "3": "Error",
+        "4": "Warning", "5": "Notice", "6": "Informational", "7": "Debug"
+    }
+    # Match L1, L2, L3, etc.
+    custom_level_match = re.search(r"\bL([0-9])\b", msg)
+    # Match RFC5424 numeric level
+    rfc_num_match = re.search(r"\b([0-7])\b", msg)
+    # Match standard log levels
     loglevel_match = re.search(r"\b(debug|info|warn|error|critical|notice|trace)\b", msg, re.IGNORECASE)
-    return rfc_match.group(1) if rfc_match else "Unknown", (
-        loglevel_match.group(1).lower() if loglevel_match else "Unknown"
-    )
+
+    if custom_level_match:
+        rfc_val = custom_level_match.group(1)
+        log_level = rfc5424_map.get(rfc_val, "Unknown")
+        return rfc_val, log_level
+    elif rfc_num_match:
+        rfc_val = rfc_num_match.group(1)
+        log_level = rfc5424_map.get(rfc_val, "Unknown")
+        return rfc_val, log_level
+    elif loglevel_match:
+        log_level = loglevel_match.group(1).capitalize()
+        return "Unknown", log_level
+    else:
+        return "Unknown", "Unknown"
 
 if "message" in df.columns:
     df["RFC52424"], df["log_level_text"] = zip(*df["message"].astype(str).apply(extract_rfc5424_and_loglevel))
