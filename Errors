@@ -1,23 +1,10 @@
 # Robust datetime parsing, force UTC
 df["@timestamp"] = pd.to_datetime(df["@timestamp"], errors="coerce", utc=True)
 
-# Handle invalid timestamps
-bad_ts = df["@timestamp"].isna().sum()
-if bad_ts > 0:
-    print(f"⚠️ Dropping {bad_ts} rows with invalid timestamps")
-    df = df.dropna(subset=["@timestamp"])
+# If some rows became NaT, fill them
+if df["@timestamp"].isna().any():
+    print(f"⚠️ Found {df['@timestamp'].isna().sum()} rows with invalid @timestamp, filling forward/backward.")
+    df["@timestamp"] = df["@timestamp"].fillna(method="ffill").fillna(method="bfill")
 
+# Use @timestamp as index
 df = df.sort_values("@timestamp").set_index("@timestamp")
-window_size = "5min"
-
-# Burst count per template
-df["burst_count"] = (
-    df.groupby("features.tpl_hash")["features.tpl_hash"]
-      .transform(lambda x: x.rolling(window=window_size).count())
-)
-
-# Burst flag (μ+3σ rule)
-template_stats = df.groupby("features.tpl_hash")["burst_count"].agg(["mean", "std"]).reset_index()
-template_stats["threshold"] = template_stats["mean"] + 3 * template_stats["std"]
-df = df.merge(template_stats[["features.tpl_hash", "threshold"]], on="features.tpl_hash", how="left")
-df["burst_flag"] = (df["burst_count"] > df["threshold"]).astype(int)
