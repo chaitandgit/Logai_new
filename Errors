@@ -1,13 +1,9 @@
-D:\logai-main\logai\elastic_wrapper.py:88: FutureWarning: In a future version of pandas, parsing datetimes with mixed time zones will raise an error unless `utc=True`. Please specify `utc=True` to opt in to the new behaviour and silence this warning. To create a `Series` with mixed offsets and `object` dtype, please use `apply` and `datetime.datetime.strptime`
-  df["@timestamp"] = pd.to_datetime(df["@timestamp"], errors="coerce")
-⚠️ Found 2893 invalid timestamps
-Traceback (most recent call last):
-  File "D:\logai-main\logai\elastic_wrapper.py", line 103, in <module>
-    df.groupby("features.tpl_hash")
-  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\groupby\groupby.py", line 3885, in rolling
-    return RollingGroupby(
-  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\window\rolling.py", line 713, in __init__
-    super().__init__(obj, *args, **kwargs)
-  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\window\rolling.py", line 164, in __init__
-    raise ValueError(
-ValueError: invalid on specified as @timestamp, must be a column (of DataFrame), an Index or None
+df["@timestamp"] = pd.to_datetime(df["@timestamp"], errors="coerce", utc=True)
+
+# Drop rows with invalid timestamps if any
+bad_ts = df["@timestamp"].isna().sum()
+if bad_ts > 0:
+    print(f"⚠️ Dropping {bad_ts} rows with invalid timestamps")
+    df = df.dropna(subset=["@timestamp"])
+
+df = df.sort_values("@timestamp")
