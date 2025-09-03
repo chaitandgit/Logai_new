@@ -56,7 +56,25 @@ flattened_records = [flatten_dict(hit["_source"]) for hit in resp["hits"]["hits"
 df = pd.DataFrame(flattened_records)
 
 # --------------------------------------------------------
-# 4. Feature engineering
+# 4. Robust timestamp parsing
+# --------------------------------------------------------
+def safe_parse(ts):
+    try:
+        return parser.isoparse(str(ts)).astimezone(pytz.UTC)
+    except Exception:
+        return pd.NaT
+
+df["@timestamp"] = df["@timestamp"].apply(safe_parse)
+
+bad_ts = df["@timestamp"].isna().sum()
+if bad_ts > 0:
+    print(f"⚠️ Dropping {bad_ts} rows with invalid timestamps")
+    df = df.dropna(subset=["@timestamp"])
+
+df = df.sort_values("@timestamp")
+
+# --------------------------------------------------------
+# 5. Feature engineering
 # --------------------------------------------------------
 def extract_code_and_text(row):
     code = row.get("features.tpl_hash") or row.get("metadata.sample_first")
@@ -82,24 +100,16 @@ else:
     df["RFC52424"], df["log_level_text"] = "Unknown", "Unknown"
 
 # --------------------------------------------------------
-# 4b. Burst & sequence anomalies
+# 6. Burst & sequence anomalies
 # --------------------------------------------------------
-# Trust @timestamp from ES
-df["@timestamp"] = pd.to_datetime(df["@timestamp"], errors="coerce")
-
-if df["@timestamp"].isna().any():
-    print(f"⚠️ Found {df['@timestamp'].isna().sum()} invalid timestamps")
-
-df = df.sort_values("@timestamp").set_index("@timestamp")
-window_size = "5min"
-
-# Burst detection
 df["burst_count"] = (
-    df.groupby("features.tpl_hash")["features.tpl_hash"]
-      .transform(lambda x: x.rolling(window=window_size).count())
+    df.groupby("features.tpl_hash")
+      .rolling("5min", on="@timestamp")
+      .count()["features.tpl_hash"]
+      .reset_index(level=0, drop=True)
 )
 
-# Burst flag (μ+3σ rule)
+# Burst flag
 template_stats = df.groupby("features.tpl_hash")["burst_count"].agg(["mean", "std"]).reset_index()
 template_stats["threshold"] = template_stats["mean"] + 3 * template_stats["std"]
 df = df.merge(template_stats[["features.tpl_hash", "threshold"]], on="features.tpl_hash", how="left")
@@ -114,10 +124,8 @@ bigram_counts = df["tpl_bigram"].value_counts()
 valid_bigrams = set(bigram_counts[bigram_counts > 5].index)
 df["sequence_flag"] = (~df["tpl_bigram"].isin(valid_bigrams)).astype(int)
 
-df = df.reset_index(drop=True)
-
 # --------------------------------------------------------
-# 5. Schema setup
+# 7. Schema setup
 # --------------------------------------------------------
 numerical_features = [
     "features.tpl_len", "features.var_cnt", "features.tpl_complexity",
@@ -164,7 +172,7 @@ for col in categorical_features:
 print("Columns with Unknown replacements:", unknown_report)
 
 # --------------------------------------------------------
-# 6. Isolation Forest
+# 8. Isolation Forest
 # --------------------------------------------------------
 contamination_value = (
     cfg.get("ml_training", {}).get("autoencoder", {}).get("params", {}).get("contamination")
@@ -191,7 +199,7 @@ result_iforest = detector_iforest.predict(X_iforest)
 df["anomaly_label_iforest"] = result_iforest["anom_score"]
 
 # --------------------------------------------------------
-# 7. AutoEncoder
+# 9. AutoEncoder
 # --------------------------------------------------------
 ae_cfg = cfg["ml_training"].get("autoencoder", {})
 ae_params = ae_cfg.get("params", {})
@@ -235,7 +243,8 @@ def explain_row(row):
     return f"Unusual {top_feat.replace('recon_err_', '')}: value {row[top_feat.replace('recon_err_', '')]}, reconstruction error high"
 
 df["explanation_text"] = df.apply(
-    lambda r: explain_row(r) if r["anomaly_label_autoencoder"] == 1 else "", axis=1
+    lambda r: explain_row(r) if r["anomaly_label_autoencoder"] == 1 else "",
+    axis=1
 )
 
 print("=== Sample anomaly explanations ===")
@@ -243,7 +252,7 @@ print(df.loc[df["anomaly_label_autoencoder"] == 1,
              ["anomaly_score_autoencoder", "explanation_text"]].head())
 
 # --------------------------------------------------------
-# 8. Ensemble
+# 10. Ensemble
 # --------------------------------------------------------
 df["anomaly_label_iforest"] = (df["anomaly_label_iforest"] == -1).astype(int)
 df["anomaly_label_autoencoder"] = (df["anomaly_label_autoencoder"] == 1).astype(int)
@@ -256,7 +265,7 @@ print("\n=== Anomaly counts ===")
 print(df[["anomaly_label_iforest", "anomaly_label_autoencoder", "anomaly_label_ensemble"]].value_counts())
 
 # --------------------------------------------------------
-# 9. Save results
+# 11. Save results
 # --------------------------------------------------------
 cols_to_exclude = [f"recon_err_{col}" for col in feature_cols_ae]
 output_cols = [c for c in df.columns if c not in cols_to_exclude]
