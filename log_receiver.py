@@ -88,14 +88,42 @@ else:
     df["log_level_text"] = "Unknown"
 
 # --------------------------------------------------------
+# 4b. Template-aware burst & sequence anomalies
+# --------------------------------------------------------
+df = df.sort_values("@timestamp")  # ensure time order
+window_size = "5min"
+
+# Burst detection
+df["burst_count"] = (
+    df.set_index(pd.to_datetime(df["@timestamp"]))
+      .groupby("features.tpl_hash")["features.tpl_hash"]
+      .transform(lambda x: x.rolling(window=window_size).count())
+)
+
+template_stats = df.groupby("features.tpl_hash")["burst_count"].agg(["mean", "std"]).reset_index()
+template_stats["threshold"] = template_stats["mean"] + 3 * template_stats["std"]
+df = df.merge(template_stats[["features.tpl_hash", "threshold"]], on="features.tpl_hash", how="left")
+df["burst_flag"] = (df["burst_count"] > df["threshold"]).astype(int)
+
+# Sequence detection
+tpl_ids = df["features.tpl_hash"].astype("category").cat.codes
+df["tpl_id"] = tpl_ids
+df["tpl_prev"] = df["tpl_id"].shift(1)
+df["tpl_bigram"] = df["tpl_prev"].astype(str) + "->" + df["tpl_id"].astype(str)
+
+bigram_counts = df["tpl_bigram"].value_counts()
+valid_bigrams = set(bigram_counts[bigram_counts > 5].index)
+df["sequence_flag"] = (~df["tpl_bigram"].isin(valid_bigrams)).astype(int)
+
+# --------------------------------------------------------
 # 5. Schema setup
 # --------------------------------------------------------
 numerical_features = [
     "features.tpl_len", "features.var_cnt", "features.tpl_complexity",
     "features.hour", "features.msg_len", "features.word_count",
-    "metadata.cluster_size", "metadata.tpl_count"
+    "metadata.cluster_size", "metadata.tpl_count", "burst_count"
 ]
-boolean_features = ["features.is_dynamic", "features.has_numbers"]
+boolean_features = ["features.is_dynamic", "features.has_numbers", "burst_flag", "sequence_flag"]
 categorical_features = ["metadata.device_id", "metadata.source_file", "extracted_code"]
 
 # Convert features.hour → CST hour
@@ -108,30 +136,37 @@ if "features.hour" in df.columns:
             return None
     df["features.hour"] = df["features.hour"].apply(convert_hour_to_cst)
 
-# Ensure columns exist with proper types
+# --------------------------------------------------------
+# 5b. Normalize Unknowns across features
+# --------------------------------------------------------
+print("\n--- Cleaning Unknown values ---")
+unknown_report = {}
+
+# Numeric features
 for col in numerical_features:
     if col not in df.columns:
         df[col] = float("nan")
-    df[col] = pd.to_numeric(df[col], errors="coerce")
+    bad_mask = df[col].astype(str).str.contains("Unknown", case=False, na=False)
+    if bad_mask.any():
+        unknown_report[col] = df.loc[bad_mask, col].unique().tolist()
+    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
 
+# Boolean features
 for col in boolean_features:
     if col not in df.columns:
         df[col] = False
     df[col] = df[col].astype(bool)
 
+# Categorical features
 for col in categorical_features:
     if col not in df.columns:
         df[col] = ""
-    df[col] = df[col].astype(str)
+    bad_mask = df[col].astype(str).str.contains("Unknown", case=False, na=False)
+    if bad_mask.any():
+        unknown_report[col] = df.loc[bad_mask, col].unique().tolist()
+    df[col] = df[col].astype(str).replace("Unknown", "")
 
-feature_cols = numerical_features + boolean_features + categorical_features
-X = df[feature_cols].copy()
-if X.empty:
-    print("❌ No data from ES for given query.")
-    exit()
-
-print("✅ Preview of flattened DataFrame:")
-print(df.head())
+print("Columns with Unknown replacements:", unknown_report)
 
 # --------------------------------------------------------
 # 6. Isolation Forest
@@ -151,7 +186,7 @@ params = IsolationForestParams(
 )
 
 detector_iforest = IsolationForestDetector(params)
-X_iforest = df[feature_cols].copy()
+X_iforest = df[numerical_features + boolean_features + categorical_features].copy()
 
 if categorical_features:
     encoder = LabelEncoding()
