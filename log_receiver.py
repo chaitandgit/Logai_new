@@ -1,8 +1,48 @@
+# --------------------------------------------------------
+# 4b. Template-aware burst & sequence anomalies
+# --------------------------------------------------------
+
+# --- Burst detection ---
+
+# Robust datetime parsing
+df["@timestamp"] = pd.to_datetime(df["@timestamp"], errors="coerce", format="mixed")
+df = df.set_index(df["@timestamp"])  # safe indexing
+window_size = "5min"  # adjust as needed
+
+# Rolling counts per template
+df["burst_count"] = (
+        df.groupby("features.tpl_hash")["features.tpl_hash"]
+            .transform(lambda x: x.rolling(window=window_size).count())
+)
+df = df.reset_index(drop=True)  # reset after burst calc
+
+# Burst flag: template count higher than its mean + 3σ (per template)
+template_stats = df.groupby("features.tpl_hash")["burst_count"].agg(["mean", "std"]).reset_index()
+template_stats["threshold"] = template_stats["mean"] + 3 * template_stats["std"]
+df = df.merge(template_stats[["features.tpl_hash", "threshold"]], on="features.tpl_hash", how="left")
+df["burst_flag"] = (df["burst_count"] > df["threshold"]).astype(int)
+
+
+# --- Sequence mismatch detection ---
+# Encode template IDs numerically
+tpl_ids = df["features.tpl_hash"].astype("category").cat.codes
+df["tpl_id"] = tpl_ids
+
+# Build bigrams of (prev, current)
+df["tpl_prev"] = df["tpl_id"].shift(1)
+df["tpl_bigram"] = df["tpl_prev"].astype(str) + "->" + df["tpl_id"].astype(str)
+
+# Learn frequent transitions (bigrams)
+bigram_counts = df["tpl_bigram"].value_counts()
+valid_bigrams = set(bigram_counts[bigram_counts > 5].index)  # keep only frequent ones
+
+# Sequence flag: 1 if bigram not seen often before
+df["sequence_flag"] = (~df["tpl_bigram"].isin(valid_bigrams)).astype(int)
 import os
+import pandas as pd
 import re
 import yaml
 import pytz
-import numpy as np
 import pandas as pd
 from dateutil import parser
 from elasticsearch import Elasticsearch
@@ -56,6 +96,15 @@ def flatten_dict(d, parent_key='', sep='.'):
 
 flattened_records = [flatten_dict(hit["_source"]) for hit in resp["hits"]["hits"]]
 df = pd.DataFrame(flattened_records)
+# Robust datetime parsing and burst detection
+df["@timestamp"] = pd.to_datetime(df["@timestamp"], errors="coerce", format="mixed")
+df = df.set_index(df["@timestamp"])  # safe indexing
+window_size = "5min"  # adjust as needed
+df["burst_count"] = (
+        df.groupby("features.tpl_hash")["features.tpl_hash"]
+            .transform(lambda x: x.rolling(window=window_size).count())
+)
+df = df.reset_index(drop=True)  # reset after burst calc
 
 # --------------------------------------------------------
 # 4. Extra feature engineering
