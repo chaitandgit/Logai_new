@@ -1,1 +1,21 @@
-@timestamp,doc_id,features.tpl_hash,features.tpl_len,features.var_cnt,features.is_dynamic,features.tpl_complexity,features.hour,features.msg_len,features.word_count,features.has_numbers,metadata.template,metadata.tpl_hash,metadata.cluster_size,metadata.tpl_count,metadata.source_file,metadata.device_id,metadata.sample_first,metadata.sample_last,metadata.first_seen,metadata.last_seen,metadata.sample_not_available,extracted_code,RFC52424,log_level_text,anomaly_label_iforest,anomaly_score_autoencoder,anomaly_label_autoencoder,explanation_text,anomaly_label_ensemble
+D:\logai-main\logai\elastic_wrapper.py:88: FutureWarning: In a future version of pandas, parsing datetimes with mixed time zones will raise an error unless `utc=True`. Please specify `utc=True` to opt in to the new behaviour and silence this warning. To create a `Series` with mixed offsets and `object` dtype, please use `apply` and `datetime.datetime.strptime`
+  df["@timestamp"] = pd.to_datetime(df["@timestamp"], errors="coerce")
+⚠️ Found 2893 invalid timestamps
+Traceback (most recent call last):
+  File "D:\logai-main\logai\elastic_wrapper.py", line 99, in <module>
+    .transform(lambda x: x.rolling(window=window_size).count())
+  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\groupby\generic.py", line 517, in transform
+    return self._transform(
+  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\groupby\groupby.py", line 2027, in _transform
+    return self._transform_general(func, engine, engine_kwargs, *args, **kwargs)
+  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\groupby\generic.py", line 557, in _transform_general
+    res = func(group, *args, **kwargs)
+  File "D:\logai-main\logai\elastic_wrapper.py", line 99, in <lambda>
+    .transform(lambda x: x.rolling(window=window_size).count())
+  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\generic.py", line 12599, in rolling
+    return Rolling(
+  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\window\rolling.py", line 170, in __init__
+    self._validate()
+  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\window\rolling.py", line 1914, in _validate
+    raise ValueError("window must be an integer 0 or greater")
+ValueError: window must be an integer 0 or greater
