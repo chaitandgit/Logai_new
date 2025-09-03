@@ -1,8 +1,3 @@
-pip install -U pip setuptools wheel
-pip install pandas elasticsearch scikit-learn pyyaml
+from logai.algorithms.anomaly_detection_algo.autoencoder import AutoEncoderDetector
 
-cd D:/logai_new
-pip install -e .
-
-python -c "import logai; print(logai.__file__)"
-
+from logai.algorithms.anomaly_detection_algo.autoencoder import AutoEncoderDetector
