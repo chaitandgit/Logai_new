@@ -110,15 +110,18 @@ if "message" in df.columns:
 else:
     df["RFC52424"], df["log_level_text"] = "Unknown", "Unknown"
 
+
 # --------------------------------------------------------
 # 6. Burst & sequence anomalies
 # --------------------------------------------------------
-df["burst_count"] = (
-    df.groupby("features.tpl_hash")
-      .rolling("5min", on="@timestamp")
-      .count()["features.tpl_hash"]
-      .reset_index(level=0, drop=True)
+print("Columns before burst block:", df.columns.tolist())
+burst_counts = (
+        df.groupby("features.tpl_hash")
+            .rolling("5min", on="@timestamp")["metadata.cluster_size"]
+            .sum()
+            .reset_index()
 )
+df["burst_count"] = burst_counts["metadata.cluster_size"]
 
 # Burst flag
 template_stats = df.groupby("features.tpl_hash")["burst_count"].agg(["mean", "std"]).reset_index()
@@ -224,7 +227,7 @@ num_features_ae = [c for c in feature_cols_ae if c not in cat_features_ae and c 
 
 ohe = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
 cat_encoded = ohe.fit_transform(df[cat_features_ae].astype(str)) if cat_features_ae else np.empty((len(df), 0))
-num_data = df[num_features_ae].fillna(0).astype(float).values if num_features_ae else np.empty((len(df), 0))
+num_data = df[num_features_ae].replace('Unknown', np.nan).fillna(0).astype(float).values if num_features_ae else np.empty((len(df), 0))
 X_ae = np.hstack([num_data, cat_encoded])
 
 detector_ae = AutoEncoderDetector(
