@@ -113,3 +113,11 @@ df = pd.concat([df, error_df.add_prefix("recon_err_")], axis=1)
 print("=== Sample anomaly explanations ===")
 print(df.loc[df["anomaly_label_autoencoder"] == 1,
              ["anomaly_score_autoencoder"] + [c for c in df.columns if c.startswith("recon_err_")]].head())
+
+
+def explain_row(row):
+    top_feat = row["explanation"][0].split("=")[0].replace("recon_err_", "")
+    return f"Unusual {top_feat}: value {row[top_feat]}, reconstruction error high"
+    
+df["explanation_text"] = df.apply(lambda r: explain_row(r), axis=1)
+
