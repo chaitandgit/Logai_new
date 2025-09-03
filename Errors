@@ -1,10 +1,1 @@
-# Robust datetime parsing, force UTC
-df["@timestamp"] = pd.to_datetime(df["@timestamp"], errors="coerce", utc=True)
-
-# If some rows became NaT, fill them
-if df["@timestamp"].isna().any():
-    print(f"⚠️ Found {df['@timestamp'].isna().sum()} rows with invalid @timestamp, filling forward/backward.")
-    df["@timestamp"] = df["@timestamp"].fillna(method="ffill").fillna(method="bfill")
-
-# Use @timestamp as index
-df = df.sort_values("@timestamp").set_index("@timestamp")
+@timestamp,doc_id,features.tpl_hash,features.tpl_len,features.var_cnt,features.is_dynamic,features.tpl_complexity,features.hour,features.msg_len,features.word_count,features.has_numbers,metadata.template,metadata.tpl_hash,metadata.cluster_size,metadata.tpl_count,metadata.source_file,metadata.device_id,metadata.sample_first,metadata.sample_last,metadata.first_seen,metadata.last_seen,metadata.sample_not_available,extracted_code,RFC52424,log_level_text,anomaly_label_iforest,anomaly_score_autoencoder,anomaly_label_autoencoder,explanation_text,anomaly_label_ensemble
