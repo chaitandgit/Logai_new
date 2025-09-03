@@ -1,9 +1,7 @@
-df["@timestamp"] = pd.to_datetime(df["@timestamp"], errors="coerce", utc=True)
-
-# Drop rows with invalid timestamps if any
-bad_ts = df["@timestamp"].isna().sum()
-if bad_ts > 0:
-    print(f"⚠️ Dropping {bad_ts} rows with invalid timestamps")
-    df = df.dropna(subset=["@timestamp"])
-
-df = df.sort_values("@timestamp")
+⚠️ Dropping 2893 rows with invalid timestamps
+Traceback (most recent call last):
+  File "D:\logai-main\logai\elastic_wrapper.py", line 108, in <module>
+    .size()
+  File "C:\Users\cg722v\Miniconda3\envs\logai-py310\lib\site-packages\pandas\core\window\rolling.py", line 321, in __getattr__
+    raise AttributeError(
+AttributeError: 'RollingGroupby' object has no attribute 'size'
