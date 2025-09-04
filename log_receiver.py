@@ -266,3 +266,23 @@ for _, row in df.iterrows():
         doc_as_upsert=True
     )
 print("✅ Analyzed results upserted to ES")
+
+
+
+# --------------------------------------------------------
+# 2. Connect to Elasticsearch & run query with _source filter
+# --------------------------------------------------------
+es = Elasticsearch(
+    [es_cfg["host"]],
+    basic_auth=(es_cfg["username"], es_cfg["password"]),
+    verify_certs=True,
+)
+
+resp = es.search(
+    index=es_cfg["index"],
+    body={
+        "_source": ["@timestamp", "doc_id", "features.*", "metadata.*"],
+        "query": es_cfg["query"]
+    },
+    size=5000
+)
