@@ -87,10 +87,11 @@ if bad_ts > 0:
 df = df.sort_values("@timestamp")
 
 # --------------------------------------------------------
-# 4b. Clean useless templates like "<*>" before ML
+# 4b. Clean useless templates before ML
 # --------------------------------------------------------
 def clean_template(row):
     template = str(row.get("metadata.template", "")).strip()
+    # Replace empty or <*> with first/last sample or fallback
     if not template or template == "<*>":
         if pd.notna(row.get("metadata.sample_first")) and row["metadata.sample_first"]:
             return row["metadata.sample_first"]
@@ -102,6 +103,13 @@ def clean_template(row):
 
 df["metadata.template"] = df.apply(clean_template, axis=1)
 
+# Drop rows that still look like junk (AAA IN, .odl, etc.)
+junk_mask = df["metadata.template"].str.contains(r"^\W*$|AAA|\.odl|IN$", case=False, na=False)
+dropped = junk_mask.sum()
+if dropped > 0:
+    print(f"⚠️ Dropping {dropped} junk rows from templates")
+    df = df[~junk_mask]
+
 # --------------------------------------------------------
 # 5. Feature engineering
 # --------------------------------------------------------
@@ -110,20 +118,17 @@ def extract_code_and_text(row):
     text = row.get("features.tpl_text") or row.get("metadata.sample_first")
     return code, text
 
-
 def check_mismatch(row):
     return 0 if row.get("metadata.sample_first") == row.get("metadata.sample_last") else 1
-
 
 df["extracted_code"], df["extracted_text"] = zip(*df.apply(extract_code_and_text, axis=1))
 df["template_mismatch_flag"] = df.apply(check_mismatch, axis=1)
 
 # --------------------------------------------------------
-# 5b. OpenWrt-aware log level extraction + mismatch
+# 5b. OpenWrt-aware log level extraction
 # --------------------------------------------------------
 def extract_level_info_openwrt(row):
     mismatch_flag = 0
-
     if pd.notna(row.get("metadata.template")) and row["metadata.template"]:
         text = str(row["metadata.template"])
     elif pd.notna(row.get("metadata.sample_first")) and pd.notna(row.get("metadata.sample_last")):
@@ -135,17 +140,18 @@ def extract_level_info_openwrt(row):
     else:
         text = str(row.get("metadata.sample_first") or row.get("metadata.sample_last") or row.get("message", ""))
 
+    # Prefer textual severity
     m = re.search(r"\b(debug|info|warn|error|critical|notice|trace)\b", text, re.IGNORECASE)
     if m:
         return pd.Series(["Unknown", m.group(1).capitalize(), mismatch_flag])
 
+    # Match L0..L7
     m = re.search(r"\bL([0-7])\b", text)
     if m:
         lnum = m.group(1)
         return pd.Series([f"L{lnum}", f"DeviceLevel{lnum}", mismatch_flag])
 
     return pd.Series(["Unknown", "Unknown", mismatch_flag])
-
 
 df[["log_level_code", "log_level_text", "log_level_mismatch"]] = df.apply(
     extract_level_info_openwrt, axis=1
@@ -176,29 +182,14 @@ valid_bigrams = set(bigram_counts[bigram_counts > 5].index)
 df["sequence_flag"] = (~df["tpl_bigram"].isin(valid_bigrams)).astype(int)
 
 # --------------------------------------------------------
-# 7. Rule-based CRITICAL/CRASH flag
-# --------------------------------------------------------
-df["critical_flag"] = df.apply(
-    lambda r: 1 if (
-        re.search(r"\bcritical\b", str(r.get("metadata.template", "")), re.IGNORECASE)
-        or re.search(r"\bcritical\b", str(r.get("metadata.sample_first", "")), re.IGNORECASE)
-        or re.search(r"\bcritical\b", str(r.get("metadata.sample_last", "")), re.IGNORECASE)
-        or re.search(r"\bcrash(ed|ing)?\b", str(r.get("metadata.template", "")), re.IGNORECASE)
-        or re.search(r"\bcrash(ed|ing)?\b", str(r.get("metadata.sample_first", "")), re.IGNORECASE)
-        or re.search(r"\bcrash(ed|ing)?\b", str(r.get("metadata.sample_last", "")), re.IGNORECASE)
-    ) else 0,
-    axis=1
-)
-
-# --------------------------------------------------------
-# 8. Schema setup
+# 7. Schema setup
 # --------------------------------------------------------
 numerical_features = [
     "features.tpl_len", "features.var_cnt", "features.tpl_complexity",
     "features.hour", "features.msg_len", "features.word_count",
     "metadata.cluster_size", "metadata.tpl_count", "burst_count"
 ]
-boolean_features = ["features.is_dynamic", "features.has_numbers", "burst_flag", "sequence_flag", "critical_flag"]
+boolean_features = ["features.is_dynamic", "features.has_numbers", "burst_flag", "sequence_flag"]
 categorical_features = ["metadata.device_id", "metadata.source_file", "extracted_code"]
 
 if "features.hour" in df.columns:
@@ -225,7 +216,7 @@ for col in categorical_features:
     df[col] = df[col].astype(str).replace("Unknown", "")
 
 # --------------------------------------------------------
-# 9. Isolation Forest
+# 8. Isolation Forest
 # --------------------------------------------------------
 contamination_value = (
     cfg.get("ml_training", {}).get("autoencoder", {}).get("params", {}).get("contamination")
@@ -252,7 +243,7 @@ result_iforest = detector_iforest.predict(X_iforest)
 df["anomaly_label_iforest"] = result_iforest["anom_score"]
 
 # --------------------------------------------------------
-# 10. AutoEncoder
+# 9. AutoEncoder
 # --------------------------------------------------------
 ae_cfg = cfg["ml_training"].get("autoencoder", {})
 ae_params = ae_cfg.get("params", {})
@@ -286,7 +277,7 @@ error_df = pd.DataFrame(errors_ae, columns=feature_cols_ae)
 df = pd.concat([df, error_df.add_prefix("recon_err_")], axis=1)
 
 # --------------------------------------------------------
-# 11. Explanations + Final Label
+# 10. Explanations (AutoEncoder + Burst + Sequence + Mismatch + Critical force include)
 # --------------------------------------------------------
 def explain_row(row):
     reasons = []
@@ -307,29 +298,26 @@ def explain_row(row):
     if row.get("log_level_mismatch", 0) == 1:
         reasons.append("Mismatch: sample_first vs sample_last differ")
 
-    if row.get("critical_flag", 0) == 1:
-        reasons.append("Severity: Critical/Error/Crash detected")
+    # Force include "critical" or "crash" even if ML missed it
+    text_fields = " ".join([str(row.get("metadata.template", "")),
+                            str(row.get("metadata.sample_first", "")),
+                            str(row.get("metadata.sample_last", ""))]).lower()
+    if any(keyword in text_fields for keyword in ["critical", "crash"]):
+        reasons.append("ForceInclude: Critical/Crash detected")
 
     return " | ".join(reasons) if reasons else ""
 
-
 df["explanation_text"] = df.apply(explain_row, axis=1)
 
+# --------------------------------------------------------
+# 11. Ensemble
+# --------------------------------------------------------
 df["anomaly_label_iforest"] = (df["anomaly_label_iforest"] == -1).astype(int)
 df["anomaly_label_autoencoder"] = (df["anomaly_label_autoencoder"] == 1).astype(int)
+df["anomaly_label_ensemble"] = ((df["anomaly_label_iforest"] + df["anomaly_label_autoencoder"]) >= 1).astype(int)
 
-# Final ensemble: ML or rule-based
-df["anomaly_label_final"] = (
-    (df["anomaly_label_iforest"] == 1)
-    | (df["anomaly_label_autoencoder"] == 1)
-    | (df["critical_flag"] == 1)
-    | (df["burst_flag"] == 1)
-    | (df["sequence_flag"] == 1)
-).astype(int)
-
-print("\n=== Sample anomaly explanations ===")
-print(df.loc[df["explanation_text"] != "",
-             ["anomaly_label_final", "explanation_text"]].head())
+# Force mark critical/crash as anomalies
+df.loc[df["explanation_text"].str.contains("ForceInclude", case=False), "anomaly_label_ensemble"] = 1
 
 # --------------------------------------------------------
 # 12. Save results
