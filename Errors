@@ -1,1 +1,4 @@
-=- (handle_resource_transition_critical)
+there are some critical messages like these, but I can't see them, what to do to see them?
+
+	
+2025-09-03T11:12:33.003602 L3 resmonhelper: RMMEM   - [x] Memory usage moving to CRITICAL state at 81.00%
