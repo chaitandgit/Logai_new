@@ -1,4 +1,29 @@
-there are some critical messages like these, but I can't see them, what to do to see them?
+Right after you extract log_level_text, add:
 
-	
-2025-09-03T11:12:33.003602 L3 resmonhelper: RMMEM   - [x] Memory usage moving to CRITICAL state at 81.00%
+# --------------------------------------------------------
+#  Critical / Crash rule-based flag
+# --------------------------------------------------------
+crash_keywords = ["crash", "panic", "segfault", "fatal", "core dump"]
+
+def is_critical_or_crash(row):
+    loglevel = str(row.get("log_level_text", "")).lower()
+    message = str(row.get("metadata.sample_first", "")).lower() + " " + str(row.get("metadata.sample_last", "")).lower()
+
+    # Check severity OR crash words in text
+    if "critical" in loglevel or "error" in loglevel:
+        return 1
+    for kw in crash_keywords:
+        if kw in message:
+            return 1
+    return 0
+
+df["critical_flag"] = df.apply(is_critical_or_crash, axis=1)
+
+Make sure to include it in your boolean features:
+
+boolean_features.append("critical_flag")
+
+
+In your explain_row function, add:
+if row.get("critical_flag", 0) == 1:
+    reasons.append("Severity: Critical/Error or Crash detected")
