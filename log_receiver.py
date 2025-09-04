@@ -11,6 +11,7 @@ from logai.algorithms.anomaly_detection_algo.isolation_forest import IsolationFo
 from logai.algorithms.categorical_encoding_algo.label_encoding import LabelEncoding
 from autoencoder_detector import AutoEncoderDetector
 
+
 # --------------------------------------------------------
 # 1. Load config
 # --------------------------------------------------------
@@ -21,6 +22,7 @@ def load_config(path="d:/logai-main/logai/config.yaml"):
     def replace_env(match):
         return os.environ.get(match.group(1), "")
     return yaml.safe_load(pattern.sub(replace_env, raw))
+
 
 cfg = load_config()
 es_cfg = cfg["elasticsearch"]
@@ -52,6 +54,7 @@ def flatten_dict(d, parent_key="", sep="."):
             items.append((new_key, v))
     return dict(items)
 
+
 flattened_records = [flatten_dict(hit["_source"]) for hit in resp["hits"]["hits"]]
 df = pd.DataFrame(flattened_records)
 
@@ -75,8 +78,8 @@ def safe_parse(ts):
     except Exception:
         return pd.NaT
 
-df["@timestamp"] = df["@timestamp"].apply(safe_parse)
 
+df["@timestamp"] = df["@timestamp"].apply(safe_parse)
 bad_ts = df["@timestamp"].isna().sum()
 if bad_ts > 0:
     print(f"⚠️ Dropping {bad_ts} rows with invalid timestamps")
@@ -92,54 +95,73 @@ def extract_code_and_text(row):
     text = row.get("features.tpl_text") or row.get("metadata.sample_first")
     return code, text
 
+
 def check_mismatch(row):
     return 0 if row.get("metadata.sample_first") == row.get("metadata.sample_last") else 1
+
 
 df["extracted_code"], df["extracted_text"] = zip(*df.apply(extract_code_and_text, axis=1))
 df["template_mismatch_flag"] = df.apply(check_mismatch, axis=1)
 
-def extract_rfc5424_and_loglevel(msg):
-    # Map RFC5424 numeric levels to names
-    rfc5424_map = {
-        "0": "Emergency", "1": "Alert", "2": "Critical", "3": "Error",
-        "4": "Warning", "5": "Notice", "6": "Informational", "7": "Debug"
-    }
-    # Match L1, L2, L3, etc.
-    custom_level_match = re.search(r"\bL([0-9])\b", msg)
-    # Match RFC5424 numeric level
-    rfc_num_match = re.search(r"\b([0-7])\b", msg)
-    # Match standard log levels
-    loglevel_match = re.search(r"\b(debug|info|warn|error|critical|notice|trace)\b", msg, re.IGNORECASE)
 
-    if custom_level_match:
-        rfc_val = custom_level_match.group(1)
-        log_level = rfc5424_map.get(rfc_val, "Unknown")
-        return rfc_val, log_level
-    elif rfc_num_match:
-        rfc_val = rfc_num_match.group(1)
-        log_level = rfc5424_map.get(rfc_val, "Unknown")
-        return rfc_val, log_level
-    elif loglevel_match:
-        log_level = loglevel_match.group(1).capitalize()
-        return "Unknown", log_level
+# --------------------------------------------------------
+# 5b. OpenWrt-aware log level extraction + mismatch
+# --------------------------------------------------------
+def extract_level_info_openwrt(row):
+    """
+    Extract log level info for OpenWrt/BusyBox logs.
+    - Prefer textual levels (critical, error, etc.)
+    - Fall back to device-specific L0..L7
+    - Flag mismatch if sample_first != sample_last
+    """
+    mismatch_flag = 0
+
+    # Step 1: prefer template
+    if pd.notna(row.get("metadata.template")) and row["metadata.template"]:
+        text = str(row["metadata.template"])
+    # Step 2: sample_first vs sample_last
+    elif pd.notna(row.get("metadata.sample_first")) and pd.notna(row.get("metadata.sample_last")):
+        if row["metadata.sample_first"] == row["metadata.sample_last"]:
+            text = str(row["metadata.sample_first"])
+        else:
+            mismatch_flag = 1
+            text = str(row["metadata.sample_first"])  # still parse something
+    # Step 3: fallback
     else:
-        return "Unknown", "Unknown"
+        text = str(
+            row.get("metadata.sample_first")
+            or row.get("metadata.sample_last")
+            or row.get("message", "")
+        )
 
-if "message" in df.columns:
-    df["RFC52424"], df["log_level_text"] = zip(*df["message"].astype(str).apply(extract_rfc5424_and_loglevel))
-else:
-    df["RFC52424"], df["log_level_text"] = "Unknown", "Unknown"
+    # Prefer textual severity words
+    m = re.search(r"\b(debug|info|warn|error|critical|notice|trace)\b", text, re.IGNORECASE)
+    if m:
+        return pd.Series(["Unknown", m.group(1).capitalize(), mismatch_flag])
 
+    # Otherwise match L0..L7
+    m = re.search(r"\bL([0-7])\b", text)
+    if m:
+        lnum = m.group(1)
+        return pd.Series([f"L{lnum}", f"DeviceLevel{lnum}", mismatch_flag])
+
+    # Nothing found
+    return pd.Series(["Unknown", "Unknown", mismatch_flag])
+
+
+df[["log_level_code", "log_level_text", "log_level_mismatch"]] = df.apply(
+    extract_level_info_openwrt, axis=1
+)
 
 # --------------------------------------------------------
 # 6. Burst & sequence anomalies
 # --------------------------------------------------------
 print("Columns before burst block:", df.columns.tolist())
 burst_counts = (
-        df.groupby("features.tpl_hash")
-            .rolling("5min", on="@timestamp")["metadata.cluster_size"]
-            .sum()
-            .reset_index()
+    df.groupby("features.tpl_hash")
+      .rolling("5min", on="@timestamp")["metadata.cluster_size"]
+      .sum()
+      .reset_index()
 )
 df["burst_count"] = burst_counts["metadata.cluster_size"]
 
@@ -270,7 +292,7 @@ error_df = pd.DataFrame(errors_ae, columns=feature_cols_ae)
 df = pd.concat([df, error_df.add_prefix("recon_err_")], axis=1)
 
 # --------------------------------------------------------
-# 10. Explanations (AutoEncoder + Burst + Sequence)
+# 10. Explanations (AutoEncoder + Burst + Sequence + Mismatch)
 # --------------------------------------------------------
 def explain_row(row):
     reasons = []
@@ -288,7 +310,11 @@ def explain_row(row):
     if row.get("sequence_flag", 0) == 1:
         reasons.append(f"Sequence: unexpected transition {row.get('tpl_bigram')}")
 
+    if row.get("log_level_mismatch", 0) == 1:
+        reasons.append("Mismatch: sample_first vs sample_last differ")
+
     return " | ".join(reasons) if reasons else ""
+
 
 df["explanation_text"] = df.apply(explain_row, axis=1)
 
