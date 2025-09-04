@@ -11,7 +11,6 @@ from logai.algorithms.anomaly_detection_algo.isolation_forest import IsolationFo
 from logai.algorithms.categorical_encoding_algo.label_encoding import LabelEncoding
 from autoencoder_detector import AutoEncoderDetector
 
-
 # --------------------------------------------------------
 # 1. Load config
 # --------------------------------------------------------
@@ -19,10 +18,7 @@ def load_config(path="d:/logai-main/logai/config.yaml"):
     with open(path) as f:
         raw = f.read()
     pattern = re.compile(r"\$\{([^}^{]+)\}")
-    def replace_env(match):
-        return os.environ.get(match.group(1), "")
-    return yaml.safe_load(pattern.sub(replace_env, raw))
-
+    return yaml.safe_load(pattern.sub(lambda m: os.environ.get(m.group(1), ""), raw))
 
 cfg = load_config()
 es_cfg = cfg["elasticsearch"]
@@ -54,20 +50,47 @@ def flatten_dict(d, parent_key="", sep="."):
             items.append((new_key, v))
     return dict(items)
 
-
 flattened_records = [flatten_dict(hit["_source"]) for hit in resp["hits"]["hits"]]
 df = pd.DataFrame(flattened_records)
 
 # --------------------------------------------------------
-# 3b. Ensure features.tpl_hash exists
+# 3b. Template cleanup (templates + samples)
+# --------------------------------------------------------
+def normalize_text(val: str) -> str:
+    """Strip junk and normalize."""
+    if not isinstance(val, str):
+        return ""
+    val = val.strip().strip('"')
+    val = re.sub(r"^[^\w]+", "", val)     # leading junk
+    val = re.sub(r"[^\w.:-]+$", "", val)  # trailing junk
+    return val
+
+def is_noisy(val: str) -> bool:
+    """Detect garbage strings."""
+    if not val or val == "<*>":
+        return True
+    v = val.lower()
+    if len(v) < 5:
+        return True
+    junk_patterns = [
+        r"\baaa\b", r"\bin\b", r"\bodl\b", r"\bder\b",
+        r"googleapis\.com", r"\.net$", r"netdev"
+    ]
+    return any(re.search(p, v) for p in junk_patterns)
+
+for col in ["metadata.template", "metadata.sample_first", "metadata.sample_last"]:
+    if col in df.columns:
+        df[col] = df[col].astype(str).apply(normalize_text)
+        before = len(df)
+        df = df[~df[col].apply(is_noisy)]
+        after = len(df)
+        print(f"🧹 Cleaned {col}: dropped {before - after} noisy rows")
+
+# --------------------------------------------------------
+# 3c. Ensure features.tpl_hash exists
 # --------------------------------------------------------
 if "features.tpl_hash" not in df.columns:
-    if "metadata.tpl_hash" in df.columns:
-        df["features.tpl_hash"] = df["metadata.tpl_hash"]
-        print("ℹ️ Using metadata.tpl_hash as features.tpl_hash")
-    else:
-        df["features.tpl_hash"] = "unknown_tpl"
-        print("⚠️ No tpl_hash found, assigning 'unknown_tpl'")
+    df["features.tpl_hash"] = df.get("metadata.tpl_hash", "unknown_tpl")
 
 # --------------------------------------------------------
 # 4. Robust timestamp parsing
@@ -78,30 +101,8 @@ def safe_parse(ts):
     except Exception:
         return pd.NaT
 
-
 df["@timestamp"] = df["@timestamp"].apply(safe_parse)
-bad_ts = df["@timestamp"].isna().sum()
-if bad_ts > 0:
-    print(f"⚠️ Dropping {bad_ts} rows with invalid timestamps")
-    df = df.dropna(subset=["@timestamp"])
-
-df = df.sort_values("@timestamp")
-
-# --------------------------------------------------------
-# 4b. Clean useless templates like "<*>" before ML
-# --------------------------------------------------------
-def clean_template(row):
-    template = str(row.get("metadata.template", "")).strip()
-    if not template or template == "<*>":
-        if pd.notna(row.get("metadata.sample_first")) and row["metadata.sample_first"]:
-            return row["metadata.sample_first"]
-        elif pd.notna(row.get("metadata.sample_last")) and row["metadata.sample_last"]:
-            return row["metadata.sample_last"]
-        else:
-            return "unknown_template"
-    return template
-
-df["metadata.template"] = df.apply(clean_template, axis=1)
+df = df.dropna(subset=["@timestamp"]).sort_values("@timestamp")
 
 # --------------------------------------------------------
 # 5. Feature engineering
@@ -111,47 +112,11 @@ def extract_code_and_text(row):
     text = row.get("features.tpl_text") or row.get("metadata.sample_first")
     return code, text
 
-
 def check_mismatch(row):
     return 0 if row.get("metadata.sample_first") == row.get("metadata.sample_last") else 1
 
-
 df["extracted_code"], df["extracted_text"] = zip(*df.apply(extract_code_and_text, axis=1))
 df["template_mismatch_flag"] = df.apply(check_mismatch, axis=1)
-
-
-# --------------------------------------------------------
-# 5b. OpenWrt-aware log level extraction + mismatch
-# --------------------------------------------------------
-def extract_level_info_openwrt(row):
-    mismatch_flag = 0
-
-    if pd.notna(row.get("metadata.template")) and row["metadata.template"]:
-        text = str(row["metadata.template"])
-    elif pd.notna(row.get("metadata.sample_first")) and pd.notna(row.get("metadata.sample_last")):
-        if row["metadata.sample_first"] == row["metadata.sample_last"]:
-            text = str(row["metadata.sample_first"])
-        else:
-            mismatch_flag = 1
-            text = str(row["metadata.sample_first"])
-    else:
-        text = str(row.get("metadata.sample_first") or row.get("metadata.sample_last") or row.get("message", ""))
-
-    m = re.search(r"\b(debug|info|warn|error|critical|notice|trace)\b", text, re.IGNORECASE)
-    if m:
-        return pd.Series(["Unknown", m.group(1).capitalize(), mismatch_flag])
-
-    m = re.search(r"\bL([0-7])\b", text)
-    if m:
-        lnum = m.group(1)
-        return pd.Series([f"L{lnum}", f"DeviceLevel{lnum}", mismatch_flag])
-
-    return pd.Series(["Unknown", "Unknown", mismatch_flag])
-
-
-df[["log_level_code", "log_level_text", "log_level_mismatch"]] = df.apply(
-    extract_level_info_openwrt, axis=1
-)
 
 # --------------------------------------------------------
 # 6. Burst & sequence anomalies
@@ -188,6 +153,7 @@ numerical_features = [
 boolean_features = ["features.is_dynamic", "features.has_numbers", "burst_flag", "sequence_flag"]
 categorical_features = ["metadata.device_id", "metadata.source_file", "extracted_code"]
 
+# Convert features.hour to CST
 if "features.hour" in df.columns:
     def convert_hour_to_cst(val):
         try:
@@ -196,16 +162,15 @@ if "features.hour" in df.columns:
             return None
     df["features.hour"] = df["features.hour"].apply(convert_hour_to_cst)
 
+# Normalize Unknowns
 for col in numerical_features:
     if col not in df.columns:
         df[col] = np.nan
     df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-
 for col in boolean_features:
     if col not in df.columns:
         df[col] = False
     df[col] = df[col].astype(bool)
-
 for col in categorical_features:
     if col not in df.columns:
         df[col] = ""
@@ -218,22 +183,18 @@ contamination_value = (
     cfg.get("ml_training", {}).get("autoencoder", {}).get("params", {}).get("contamination")
     or cfg["ml_training"]["isolation_forest"]["params"].get("contamination", 0.05)
 )
-
 params = IsolationForestParams(
     n_estimators=cfg["ml_training"]["isolation_forest"]["params"].get("n_estimators", 100),
     contamination=contamination_value,
     random_state=cfg["ml_training"]["isolation_forest"]["params"].get("random_state", 42),
 )
-
 detector_iforest = IsolationForestDetector(params)
 X_iforest = df[numerical_features + boolean_features + categorical_features].copy()
-
 if categorical_features:
     encoder = LabelEncoding()
     encoded = encoder.fit_transform(X_iforest[categorical_features])
     for i, col in enumerate(categorical_features):
         X_iforest[col] = encoded.iloc[:, i]
-
 detector_iforest.fit(X_iforest)
 result_iforest = detector_iforest.predict(X_iforest)
 df["anomaly_label_iforest"] = result_iforest["anom_score"]
@@ -244,18 +205,12 @@ df["anomaly_label_iforest"] = result_iforest["anom_score"]
 ae_cfg = cfg["ml_training"].get("autoencoder", {})
 ae_params = ae_cfg.get("params", {})
 feature_cols_ae = ae_cfg.get("numerical_features", numerical_features)
-
-if "RFC52424" in df.columns and "RFC52424" not in feature_cols_ae:
-    feature_cols_ae.append("RFC52424")
-
 cat_features_ae = [c for c in categorical_features if c in feature_cols_ae and c in df.columns]
 num_features_ae = [c for c in feature_cols_ae if c not in cat_features_ae and c in df.columns]
-
 ohe = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
 cat_encoded = ohe.fit_transform(df[cat_features_ae].astype(str)) if cat_features_ae else np.empty((len(df), 0))
 num_data = df[num_features_ae].fillna(0).astype(float).values if num_features_ae else np.empty((len(df), 0))
 X_ae = np.hstack([num_data, cat_encoded])
-
 detector_ae = AutoEncoderDetector(
     hidden_dim=ae_params.get("hidden_dim", 16),
     latent_dim=ae_params.get("latent_dim", 8),
@@ -264,47 +219,31 @@ detector_ae = AutoEncoderDetector(
     num_epochs=ae_params.get("num_epochs", 20),
     contamination=contamination_value,
 )
-
 detector_ae.fit(X_ae)
 scores_ae, errors_ae = detector_ae.decision_function(X_ae)
 labels_ae = detector_ae.predict(X_ae)
-
 df["anomaly_score_autoencoder"] = scores_ae
 df["anomaly_label_autoencoder"] = labels_ae
-
-error_df = pd.DataFrame(errors_ae, columns=feature_cols_ae)
-df = pd.concat([df, error_df.add_prefix("recon_err_")], axis=1)
 
 # --------------------------------------------------------
 # 10. Explanations
 # --------------------------------------------------------
 def explain_row(row):
     reasons = []
-
     if row.get("anomaly_label_autoencoder", 0) == 1:
         recon_err_cols = [c for c in df.columns if c.startswith("recon_err_")]
         if recon_err_cols:
             top_feat = max(recon_err_cols, key=lambda c: row[c])
-            feat_name = top_feat.replace("recon_err_", "")
-            reasons.append(f"Autoencoder: unusual {feat_name} (value={row[feat_name]})")
-
+            reasons.append(f"Autoencoder: unusual {top_feat} = {row[top_feat]}")
     if row.get("burst_flag", 0) == 1:
-        reasons.append(f"Burst: template {row.get('features.tpl_hash')} exceeded threshold {row.get('threshold')}")
-
+        reasons.append(f"Burst on {row.get('features.tpl_hash')}")
     if row.get("sequence_flag", 0) == 1:
-        reasons.append(f"Sequence: unexpected transition {row.get('tpl_bigram')}")
-
-    if row.get("log_level_mismatch", 0) == 1:
+        reasons.append(f"Unexpected sequence {row.get('tpl_bigram')}")
+    if row.get("template_mismatch_flag", 0) == 1:
         reasons.append("Mismatch: sample_first vs sample_last differ")
-
     return " | ".join(reasons) if reasons else ""
 
-
 df["explanation_text"] = df.apply(explain_row, axis=1)
-
-print("=== Sample anomaly explanations ===")
-print(df.loc[df["explanation_text"] != "",
-             ["anomaly_score_autoencoder", "explanation_text"]].head())
 
 # --------------------------------------------------------
 # 11. Ensemble
@@ -313,17 +252,8 @@ df["anomaly_label_iforest"] = (df["anomaly_label_iforest"] == -1).astype(int)
 df["anomaly_label_autoencoder"] = (df["anomaly_label_autoencoder"] == 1).astype(int)
 df["anomaly_label_ensemble"] = ((df["anomaly_label_iforest"] + df["anomaly_label_autoencoder"]) >= 1).astype(int)
 
-print("\n=== First few rows with anomaly labels ===")
-print(df[["anomaly_label_iforest", "anomaly_label_autoencoder", "anomaly_label_ensemble"]].head())
-
-print("\n=== Anomaly counts ===")
-print(df[["anomaly_label_iforest", "anomaly_label_autoencoder", "anomaly_label_ensemble"]].value_counts())
-
 # --------------------------------------------------------
-# 12. Save results
+# 12. Save
 # --------------------------------------------------------
-cols_to_exclude = [f"recon_err_{col}" for col in feature_cols_ae]
-output_cols = [c for c in df.columns if c not in cols_to_exclude]
-
-df.to_csv("logs_with_anomalies.csv", columns=output_cols, index=False, escapechar="\\")
-print("\n✅ Results saved to logs_with_anomalies.csv")
+df.to_csv("logs_with_anomalies.csv", index=False, escapechar="\\")
+print("\n✅ Cleaned results saved to logs_with_anomalies.csv")
